@@ -22,29 +22,35 @@ from torch import nn
 STATE_DIMENSION = 2
 NUM_DIFFUSION_STEPS = 24
 TEMPERATURE = 1.0
-BETA_START = 0.02
-BETA_END = 0.18
+BETA_START = 5.0e-4
+BETA_END = 2.0e-3
+PRIOR_STD = 30.0
+PRIOR_VARIANCE = PRIOR_STD**2
 LANGEVIN_GRADIENT_CLIP = 1.0e2
 LANGEVIN_DRIFT_CLIP = 1.0e4
 
-MODE_LOCATIONS = torch.tensor(
-    [[-3.0, -2.0], [-2.0, 2.5], [2.2, 2.7], [3.0, -1.8]]
+NUM_MODES = 40
+MODE_BOUND = 40.0
+TARGET_VARIANCE = 1.0
+TARGET_STD = math.sqrt(TARGET_VARIANCE)
+LOG_MIXTURE_WEIGHT = -math.log(NUM_MODES)
+_mode_generator = torch.Generator().manual_seed(0)
+MODE_LOCATIONS = (
+    2.0
+    * MODE_BOUND
+    * torch.rand(NUM_MODES, STATE_DIMENSION, generator=_mode_generator)
+    - MODE_BOUND
 )
-MODE_WEIGHTS = torch.tensor([0.46, 0.29, 0.17, 0.08])
-TARGET_STD = 0.5
-GLOBAL_MODE_INDEX = int(MODE_WEIGHTS.argmax())
-GLOBAL_MAX_LOCATION = MODE_LOCATIONS[GLOBAL_MODE_INDEX]
 
 
 def target_reward(states: torch.Tensor) -> torch.Tensor:
-    """Log-density reward of the weighted two-dimensional Gaussian mixture."""
+    """Log density of the seed-0, equal-weight GMM-40 benchmark."""
     locations = MODE_LOCATIONS.to(device=states.device, dtype=states.dtype)
-    weights = MODE_WEIGHTS.to(device=states.device, dtype=states.dtype)
     standardized = (states.unsqueeze(-2) - locations) / TARGET_STD
     component_log_prob = (
         -0.5 * standardized.square().sum(dim=-1)
         - STATE_DIMENSION * math.log(TARGET_STD * math.sqrt(2.0 * math.pi))
-        + weights.log()
+        + LOG_MIXTURE_WEIGHT
     )
     return torch.logsumexp(component_log_prob, dim=-1)
 
@@ -54,11 +60,10 @@ def target_log_density_gradient(
 ) -> torch.Tensor:
     """Analytic, detached gradient of log pi_T(x) = R(x) / temperature."""
     locations = MODE_LOCATIONS.to(device=states.device, dtype=states.dtype)
-    weights = MODE_WEIGHTS.to(device=states.device, dtype=states.dtype)
     differences = locations - states.unsqueeze(-2)
     component_logits = (
         -0.5 * differences.square().sum(dim=-1) / TARGET_STD**2
-        + weights.log()
+        + LOG_MIXTURE_WEIGHT
     )
     responsibilities = component_logits.softmax(dim=-1)
     gradient = (
@@ -67,70 +72,47 @@ def target_log_density_gradient(
     return (gradient / temperature).detach()
 
 
-PLOT_AXIS = torch.linspace(-5.5, 5.5, 250)
+PLOT_BOUND = 56.0
+PLOT_AXIS = torch.linspace(-PLOT_BOUND, PLOT_BOUND, 360)
 GRID_X, GRID_Y = torch.meshgrid(PLOT_AXIS, PLOT_AXIS, indexing="xy")
 GRID_POINTS = torch.stack((GRID_X, GRID_Y), dim=-1)
 REWARD_ON_GRID = target_reward(GRID_POINTS)
-DISPLAY_REWARD = REWARD_ON_GRID.clamp(min=REWARD_ON_GRID.max() - 20.0)
+DISPLAY_REWARD = REWARD_ON_GRID.clamp(min=REWARD_ON_GRID.max() - 100.0)
 REWARD_LEVELS = torch.linspace(
-    DISPLAY_REWARD.min().item(), DISPLAY_REWARD.max().item(), 32
+    DISPLAY_REWARD.min().item(), DISPLAY_REWARD.max().item(), 80
 )
 
 
 def plot_reward_landscape(axis: plt.Axes) -> None:
-    """Draw the shared yellow-to-green reward landscape and target modes."""
-    axis.contourf(
-        GRID_X, GRID_Y, DISPLAY_REWARD, levels=REWARD_LEVELS, cmap="YlGn"
-    )
+    """Draw the paper-style GMM-40 contours and component centers."""
     axis.contour(
         GRID_X,
         GRID_Y,
         DISPLAY_REWARD,
-        levels=REWARD_LEVELS[3::4],
-        colors="white",
-        linewidths=0.7,
-        alpha=0.85,
+        levels=REWARD_LEVELS,
+        cmap="viridis",
+        linewidths=0.55,
+        alpha=0.9,
     )
     axis.scatter(
         MODE_LOCATIONS[:, 0],
         MODE_LOCATIONS[:, 1],
-        s=700 * MODE_WEIGHTS,
-        c=MODE_WEIGHTS,
-        cmap="viridis",
-        edgecolor="white",
-        linewidth=1.2,
+        s=9,
+        color="#0067B1",
+        alpha=0.82,
         zorder=3,
-    )
-    for location, weight in zip(MODE_LOCATIONS, MODE_WEIGHTS):
-        axis.annotate(
-            f"target mass {100.0 * weight.item():.0f}%",
-            location + 0.18,
-            color="white",
-            fontsize=8,
-            bbox={
-                "facecolor": "black",
-                "alpha": 0.66,
-                "edgecolor": "none",
-                "pad": 1.4,
-            },
-        )
-    axis.scatter(
-        *GLOBAL_MAX_LOCATION,
-        marker="*",
-        s=280,
-        color="gold",
-        edgecolor="black",
-        linewidth=1.2,
-        zorder=5,
-        label="global reward maximum",
+        label="GMM component means",
     )
     axis.set(
-        xlim=(-5.2, 5.2),
-        ylim=(-5.2, 5.2),
-        xlabel="state x₁",
-        ylabel="state x₂",
+        xlim=(-PLOT_BOUND, PLOT_BOUND),
+        ylim=(-PLOT_BOUND, PLOT_BOUND),
+        xticks=(-40, 0, 40),
+        yticks=(-40, 0, 40),
+        xlabel=r"$x_1$",
+        ylabel=r"$x_2$",
         aspect="equal",
     )
+    axis.set_facecolor("white")
 
 
 class VPSchedule(nn.Module):
@@ -245,8 +227,9 @@ class ScoreNetwork(nn.Module):
                 -LANGEVIN_DRIFT_CLIP, LANGEVIN_DRIFT_CLIP
             )
 
-        # score=-x leaves a standard normal invariant under the VP kernel.
-        return -states + drift_correction
+        # score=-x/sigma^2 leaves N(0, sigma^2 I) invariant under the
+        # correspondingly scaled VP kernel used in this benchmark.
+        return -states / PRIOR_VARIANCE + drift_correction
 
 
 ForwardStep = Callable[..., torch.Tensor]
@@ -273,14 +256,15 @@ class ReversePath:
         return self.states[0]
 
 
-def standard_normal_log_prob(states: torch.Tensor) -> torch.Tensor:
+def prior_log_prob(states: torch.Tensor) -> torch.Tensor:
     return -0.5 * (
-        states.square() + math.log(2.0 * math.pi)
+        states.square() / PRIOR_VARIANCE
+        + math.log(2.0 * math.pi * PRIOR_VARIANCE)
     ).sum(dim=-1)
 
 
 class DiffusionSampler(nn.Module):
-    """A learned reverse VP chain starting from a standard-normal prior."""
+    """A learned reverse VP chain starting from the broad GMM-40 prior."""
 
     def __init__(
         self,
@@ -328,9 +312,11 @@ class DiffusionSampler(nn.Module):
     ) -> ReversePath:
         betas = self.schedule()
         if prior_noise is None:
-            state = torch.randn(num_samples, STATE_DIMENSION, device=self.device)
+            state = PRIOR_STD * torch.randn(
+                num_samples, STATE_DIMENSION, device=self.device
+            )
         else:
-            state = prior_noise.to(self.device)
+            state = PRIOR_STD * prior_noise.to(self.device)
             if state.shape != (num_samples, STATE_DIMENSION):
                 raise ValueError("prior_noise has the wrong shape.")
 
@@ -342,7 +328,7 @@ class DiffusionSampler(nn.Module):
 
         states: list[torch.Tensor | None] = [None] * (self.num_steps + 1)
         states[self.num_steps] = state
-        log_q = standard_normal_log_prob(state)
+        log_q = prior_log_prob(state)
         log_forward = state.new_zeros(num_samples)
 
         for step_index in reversed(range(self.num_steps)):
@@ -501,7 +487,7 @@ def train_sampler(
     seed: int = 11,
     steps: int = 1000,
     batch_size: int = 256,
-    learning_rate: float = 2.0e-3,
+    learning_rate: float = 5.0e-4,
     schedule_learning_rate: float = 3.0e-4,
     log_every: int = 25,
     initial_temperature: float = 2.0,
@@ -552,6 +538,7 @@ def train_sampler(
         "mode_fractions": [],
         "betas": [],
         "loss": [],
+        "evaluation_loss": [],
         "temperature": [],
     }
     latest_loss = float("nan")
@@ -576,6 +563,9 @@ def train_sampler(
                 history["mode_fractions"].append(nearest_mode_fractions(samples))
                 history["betas"].append(sampler.schedule().detach().cpu())
                 history["loss"].append(latest_loss)
+                history["evaluation_loss"].append(
+                    sampler.path_cost(fixed_path).mean().item()
+                )
                 history["temperature"].append(sampler.temperature)
 
         if step == steps:
@@ -645,8 +635,10 @@ def save_training_animation(
     learn_schedule: bool,
     use_langevin_preconditioning: bool,
 ) -> animation.FuncAnimation:
-    """Save the fixed-noise sample cloud over optimization iterations."""
-    fig, axis = plt.subplots(figsize=(6.4, 5.8))
+    """Save samples beside their synchronized fixed-noise path loss."""
+    fig, (axis, loss_axis) = plt.subplots(
+        1, 2, figsize=(10.8, 5.2), gridspec_kw={"width_ratios": [1.0, 0.9]}
+    )
     plot_reward_landscape(axis)
     initial_samples = history["samples"][0]
     sample_artist = axis.scatter(
@@ -663,8 +655,27 @@ def save_training_animation(
     axis.legend(loc="lower center", fontsize=8)
     title = axis.set_title("")
 
+    loss_values = history["evaluation_loss"]
+    loss_axis.plot(history["step"], loss_values, color="#0067B1", linewidth=2)
+    loss_marker = loss_axis.scatter(
+        [history["step"][0]], [loss_values[0]], s=34, color="#0067B1", zorder=3
+    )
+    current_step_line = loss_axis.axvline(
+        history["step"][0], color="#1F2937", linestyle="--", linewidth=1.4
+    )
+    loss_axis.set(
+        title="Fixed-noise path loss",
+        xlabel="optimization step",
+        ylabel="path-space objective",
+        xlim=(history["step"][0], history["step"][-1]),
+    )
+    loss_axis.grid(alpha=0.2)
+
     def update(frame: int):
         sample_artist.set_offsets(history["samples"][frame])
+        current_step = history["step"][frame]
+        current_step_line.set_xdata([current_step, current_step])
+        loss_marker.set_offsets([[current_step, loss_values[frame]]])
         schedule_label = "learned schedule" if learn_schedule else "fixed schedule"
         preconditioner_label = (
             "Langevin preconditioned"
@@ -676,7 +687,7 @@ def save_training_animation(
             f"{gradient_estimator}, {schedule_label}, {preconditioner_label}\n"
             f"step {history['step'][frame]}, T={history['temperature'][frame]:.2f}"
         )
-        return sample_artist, title
+        return sample_artist, title, current_step_line, loss_marker
 
     sample_animation = animation.FuncAnimation(
         fig,
@@ -691,3 +702,136 @@ def save_training_animation(
     )
     plt.close(fig)
     return sample_animation
+
+
+def save_training_comparison_animation(
+    experiments: list[tuple[str, bool, dict[str, list]]],
+    output_path: Path,
+) -> animation.FuncAnimation:
+    """Save the 2x2 estimator-by-preconditioning training comparison."""
+    if len(experiments) != 4:
+        raise ValueError("The comparison requires exactly four experiments.")
+
+    frame_counts = {len(history["step"]) for _, _, history in experiments}
+    step_grids = {tuple(history["step"]) for _, _, history in experiments}
+    if len(frame_counts) != 1 or len(step_grids) != 1:
+        raise ValueError("All experiments must use the same logged training steps.")
+
+    fig = plt.figure(figsize=(13.2, 8.2))
+    grid = fig.add_gridspec(
+        2, 3, width_ratios=(1.0, 1.0, 0.92), wspace=0.18, hspace=0.22
+    )
+    sample_axes = [
+        fig.add_subplot(grid[0, 0]),
+        fig.add_subplot(grid[0, 1]),
+        fig.add_subplot(grid[1, 0]),
+        fig.add_subplot(grid[1, 1]),
+    ]
+    loss_axes = [fig.add_subplot(grid[0, 2]), fig.add_subplot(grid[1, 2])]
+    sample_artists = []
+    titles = []
+    for axis, (gradient_estimator, use_langevin, history) in zip(
+        sample_axes, experiments
+    ):
+        plot_reward_landscape(axis)
+        samples = history["samples"][0]
+        sample_artists.append(
+            axis.scatter(
+                samples[:, 0],
+                samples[:, 1],
+                s=10,
+                color="#0067B1",
+                alpha=0.58,
+                zorder=4,
+            )
+        )
+        estimator_label = (
+            "Reparameterization"
+            if gradient_estimator == "reparameterization"
+            else "Log derivative"
+        )
+        langevin_label = "+ Langevin" if use_langevin else "without Langevin"
+        titles.append(axis.set_title(f"{estimator_label} · {langevin_label}"))
+
+    loss_markers = []
+    current_step_lines = []
+    for row, loss_axis in enumerate(loss_axes):
+        row_experiments = experiments[2 * row : 2 * row + 2]
+        for (_, use_langevin, history), color in zip(
+            row_experiments, ("#64748B", "#0067B1")
+        ):
+            label = "+ Langevin" if use_langevin else "without Langevin"
+            values = history["evaluation_loss"]
+            loss_axis.plot(
+                history["step"], values, color=color, linewidth=1.9, label=label
+            )
+            loss_markers.append(
+                loss_axis.scatter(
+                    [history["step"][0]],
+                    [values[0]],
+                    s=30,
+                    color=color,
+                    zorder=3,
+                )
+            )
+        current_step_lines.append(
+            loss_axis.axvline(
+                row_experiments[0][2]["step"][0],
+                color="#1F2937",
+                linestyle="--",
+                linewidth=1.3,
+            )
+        )
+        estimator_label = "Reparameterization" if row == 0 else "Log derivative"
+        loss_axis.set(
+            title=f"Path loss · {estimator_label}",
+            xlabel="optimization step",
+            ylabel="fixed-noise path objective",
+            xlim=(
+                row_experiments[0][2]["step"][0],
+                row_experiments[0][2]["step"][-1],
+            ),
+        )
+        loss_axis.grid(alpha=0.2)
+        loss_axis.legend(fontsize=8)
+
+    fig.subplots_adjust(left=0.055, right=0.985, bottom=0.075, top=0.90)
+    step_label = fig.suptitle("")
+
+    def update(frame: int):
+        for (_, _, history), sample_artist in zip(experiments, sample_artists):
+            sample_artist.set_offsets(history["samples"][frame])
+        reference_history = experiments[0][2]
+        current_step = reference_history["step"][frame]
+        for current_step_line in current_step_lines:
+            current_step_line.set_xdata([current_step, current_step])
+        for (_, _, history), loss_marker in zip(experiments, loss_markers):
+            loss_marker.set_offsets(
+                [[current_step, history["evaluation_loss"][frame]]]
+            )
+        step_label.set_text(
+            "GMM-40 diffusion sampler training  |  "
+            f"step {current_step}  |  "
+            f"T={reference_history['temperature'][frame]:.2f}"
+        )
+        return [
+            *sample_artists,
+            *titles,
+            *loss_markers,
+            *current_step_lines,
+            step_label,
+        ]
+
+    comparison_animation = animation.FuncAnimation(
+        fig,
+        update,
+        frames=frame_counts.pop(),
+        interval=700,
+        blit=False,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    comparison_animation.save(
+        output_path, writer=animation.PillowWriter(fps=1.5), dpi=92
+    )
+    plt.close(fig)
+    return comparison_animation

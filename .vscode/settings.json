@@ -8,7 +8,7 @@
         "--keep-logs",
         "--outdir",
         "%DIR%",
-        "%DOC%"
+        "%DOC_EXT%"
       ],
       "env": {}
     }
@@ -22,6 +22,7 @@
     }
   ],
   "latex-workshop.latex.recipe.default": "first",
+  "latex-workshop.latex.build.enableMagicComments": false,
   "latex-workshop.latex.autoBuild.run": "onSave",
   "latex-workshop.latex.outDir": "%DIR%",
   "latex-workshop.view.pdf.viewer": "tab"
