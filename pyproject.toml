@@ -1,7 +1,7 @@
 [project]
 name = "summer-school-gaussian-policy"
 version = "0.1.0"
-description = "Tutorial notebooks from reward maximization to diffusion samplers"
+description = "Tutorial notebooks from variational inference to diffusion samplers"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [

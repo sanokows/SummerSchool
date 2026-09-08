@@ -70,7 +70,7 @@ refers to completion, not the stricter final-goal-distance metric.
 ## Slide 8 — Tutorial and installation (4:15--4:50)
 
 “The tutorial derives this story from the beginning: variational inference,
-reinforcement learning as inference, diffusion samplers, and finally DA-MDPs.
+diffusion samplers, reinforcement learning as inference, and finally DA-MDPs.
 There are executable exercises, so please clone the repository and run
 `uv sync --locked` before the tutorial. The README contains the one-time `uv`
 installation instructions.”

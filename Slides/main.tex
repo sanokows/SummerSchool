@@ -12,6 +12,7 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{animate}
+\usepackage{qrcode}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,calc,fit,positioning,shapes.geometric}
 
@@ -263,10 +264,10 @@
           anchor=south west] at (0.27,0.82) {Variational\\inference};
     \node[fill=white,draw=Navy!16,rounded corners=1.5pt,inner xsep=4pt,
           inner ysep=2.4pt,align=center,text=Ink,font=\bfseries\scriptsize,
-          anchor=south] at (7.35,0.96) {RL as\\inference};
+          anchor=south] at (7.35,0.96) {Diffusion\\samplers};
     \node[fill=white,draw=Navy!16,rounded corners=1.5pt,inner xsep=4pt,
           inner ysep=2.4pt,align=center,text=Ink,font=\bfseries\scriptsize,
-          anchor=east] at (10.02,1.64) {Diffusion\\samplers};
+          anchor=east] at (10.02,1.64) {RL as\\inference};
 
     % Summit flag: the final lesson is the destination of the climb.
     \draw[Navy,line width=0.9pt] (m5) -- ++(0,0.72);
@@ -342,6 +343,22 @@
   {\small Same initial scene, two valid stacking orders.\\[-0.01cm]
    \scriptsize Solved with \textbf{DA--MDP: REPPO}, introduced in
    \href{https://arxiv.org/abs/2512.02019}{Sanokowski \& Patil (2026), arXiv:2512.02019}.}
+\end{frame}
+
+\begin{frame}{PushT: one initial state, two rotation modes}
+  \centering
+  \begin{minipage}{0.80\textwidth}
+    \centering
+    \makebox[0.5\linewidth]{\bfseries Clockwise}%
+    \makebox[0.5\linewidth]{\bfseries Counter-clockwise}\par
+    \vspace{0.10cm}
+    \animategraphics[autoplay,loop,poster=26,width=\linewidth]
+      {10}{assets/pusht_multimodal/frame-}{0}{116}
+  \end{minipage}
+  \vspace{0.12cm}
+
+  {\small Same initial state ($192^\circ$), same \textbf{DA:REPPO} policy.\\
+   Different diffusion-prior samples $\rightarrow$ two successful strategies.}
 \end{frame}
 
 \begin{frame}{What multimodality buys us}
@@ -469,84 +486,75 @@
   \plainlogos
 \end{frame}
 
-\begin{frame}{Problem statement: variational inference}
+\begin{frame}{Variational inference: from cost to a target distribution}
   \footnotesize
   \setlength{\abovedisplayskip}{4pt}
   \setlength{\belowdisplayskip}{4pt}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.47\textwidth}
-      \begin{block}<1->{Fit a reward-induced target ($\Tau>0$)}
-        \[
-          p_{\Tau}(x)=\frac{e^{R(x)/\Tau}}{Z_{\Tau}},
-          \qquad
-          Z_{\Tau}=\int e^{R(x)/\Tau}\,dx.
-        \]
-      \end{block}
-      \begin{block}<2->{Reverse-KL projection}
-        \[
-          \boxed{\theta^*\in\arg\min_\theta
-          \KL(q_\theta\|p_{\Tau})}.
-        \]
-        {\scriptsize
-        \[
-          \KL(q\|p)=\E_{X\sim q}\!\left[
-            \log\frac{q(X)}{p(X)}\right].
-        \]
-        }
-      \end{block}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.46\textwidth}
+      \begin{itemize}
+        \setlength{\itemsep}{0.26cm}
+        \item<1-> \textbf{Given:} cost $C(x)$; lower is better.
+        \item<2-> \textbf{Boltzmann target} ($\Tau>0$):
+          \[
+            p_{\Tau}(x)=\frac{e^{-C(x)/\Tau}}{Z_{\Tau}},
+          \]
+          \[
+            Z_{\Tau}=\int e^{-C(x)/\Tau}\,dx<\infty.
+          \]
+        \item<3-> \textbf{Approximate} $p_{\Tau}$ with tractable
+          $q_\theta$ (e.g., a Gaussian).
+        \item<4-> \textbf{Fit} $q_\theta$ by minimizing its KL divergence
+          to $p_{\Tau}$.
+      \end{itemize}
+    \column{0.52\textwidth}
+      \includegraphics[width=\linewidth]{assets/boltzmann_cost.pdf}
 
-    \column{0.49\textwidth}
-      \centering
-      \begin{tikzpicture}[x=0.62cm,y=0.84cm,font=\scriptsize]
-        \draw[->,Slate] (0.15,0) -- (6.45,0) node[right,text=Ink] {$x$};
-        \draw[->,Slate] (0.35,-0.02) -- (0.35,2.35)
-          node[above,text=Ink] {density};
-
-        \uncover<1->{%
-          \path[fill=Trail!18]
-            (0.35,0) -- plot[domain=0.35:6.25,samples=120,smooth]
-            (\x,{0.08
-              +1.25*exp(-4.4*(\x-1.20)^2)
-              +1.75*exp(-5.2*(\x-3.20)^2)
-              +1.42*exp(-4.7*(\x-5.25)^2)}) -- (6.25,0) -- cycle;
-          \draw[TrailDark,line width=1.9pt,domain=0.35:6.25,samples=120,smooth]
-            plot (\x,{0.08
-              +1.25*exp(-4.4*(\x-1.20)^2)
-              +1.75*exp(-5.2*(\x-3.20)^2)
-              +1.42*exp(-4.7*(\x-5.25)^2)});
-          \node[text=TrailDark,font=\bfseries] at (5.45,1.78)
-            {target $p_{\Tau}$};
-        }
-
-        \uncover<2->{%
-          \path[fill=BrandBlue,fill opacity=0.16]
-            (0.35,0) -- plot[domain=0.35:6.25,samples=90,smooth]
-            (\x,{1.35*exp(-1.30*(\x-3.15)^2)}) -- (6.25,0) -- cycle;
-          \draw[BrandBlue,line width=1.8pt,domain=0.35:6.25,samples=90,smooth]
-            plot (\x,{1.35*exp(-1.30*(\x-3.15)^2)});
-          \node[text=BrandBlue,font=\bfseries] at (3.15,1.52)
-            {variational $q_\theta$};
-        }
-
-        \uncover<3->{%
-          \draw[BrandBlue,dashed,line width=0.9pt]
-            (1.20,0.18) -- (1.20,1.18);
-          \draw[BrandBlue,dashed,line width=0.9pt]
-            (5.25,0.18) -- (5.25,1.32);
-          \node[text=BrandBlue,align=center] at (3.20,-0.28)
-            {one Gaussian cannot cover all modes};
-        }
-      \end{tikzpicture}
-      \vspace{0.12cm}
-
-      \uncover<3->{\scriptsize
-        A restricted reverse-KL family is mode seeking: expressivity matters.}
+      \uncover<2->{%
+        \includegraphics[width=\linewidth]{assets/boltzmann_temperatures.pdf}}
   \end{columns}
+\end{frame}
+
+\begin{frame}{Kullback--Leibler (KL) divergence}
+  \footnotesize
+  \setlength{\abovedisplayskip}{3pt}
+  \setlength{\belowdisplayskip}{3pt}
+  \begin{itemize}
+    \item<1-> \textbf{Integral $\rightarrow$ expectation:}
+      \[
+        \KL(p\|q)
+        =\int p(x)\log\frac{p(x)}{q(x)}\,dx
+        =\E_{X\sim p}\!\left[\log\frac{p(X)}{q(X)}\right].
+      \]
+    \item<2-> $\KL\geq0$; zero iff $p=q$ (a.e.); asymmetric; can be infinite.
+    \item<3-> \textbf{Same target $p$, single-Gaussian approximation $q_\theta$:}
+  \end{itemize}
+  \vspace{0.06cm}
+
+  \uncover<3->{%
+    \begin{columns}[T,onlytextwidth]
+      \column{0.49\textwidth}
+        \begin{itemize}
+          \item \textbf{Forward: mode covering}
+            \quad $\min_\theta\KL(p\|q_\theta)$
+        \end{itemize}
+        \includegraphics[width=\linewidth]{assets/kl_forward.pdf}
+      \column{0.49\textwidth}
+        \begin{itemize}
+          \item \textbf{Reverse: mode seeking}
+            \quad $\min_\theta\KL(q_\theta\|p)$
+        \end{itemize}
+        \includegraphics[width=\linewidth]{assets/kl_reverse.pdf}
+    \end{columns}
+    \begin{itemize}
+      \item \textbf{Our VI objective:} $\min_\theta\KL(q_\theta\|p_{\Tau})$.
+    \end{itemize}
+  }
 \end{frame}
 
 \begin{frame}{From variational inference to reward maximization}
   \small
-  \begin{block}<1->{Expand the reverse KL for $\Tau>0$}
+  \begin{block}<1->{Expand the reverse KL: reward $R(x)=-C(x)$, $\Tau>0$}
     \[
       \begin{aligned}
       \Tau\KL(q_\theta\|p_{\Tau})
@@ -586,44 +594,37 @@
   }
 \end{frame}
 
-\begin{frame}{Reparameterization trick for variational inference}
+\begin{frame}{Reparameterization trick: a Gaussian example}
   \footnotesize
   \setlength{\abovedisplayskip}{4pt}
   \setlength{\belowdisplayskip}{4pt}
   \begin{itemize}[<+->]
-    \item Move all randomness into parameter-free noise and rewrite the VI
-      objective over that noise:
+    \item \textbf{Start with a Gaussian:}
       \[
-        \varepsilon\sim p(\varepsilon),
-        \qquad X=g_\theta(\varepsilon).
+        q_\theta=\Normal(\mu,\sigma^2),
+        \qquad \theta=(\mu,\sigma),\quad \sigma>0.
       \]
+    \item \textbf{Sample standard noise, then shift and scale:}
       \[
-        J_{\Tau}(\theta)
-        =\E_{\varepsilon}\!\left[
-          R(g_\theta(\varepsilon))
-          -\Tau\log q_\theta(g_\theta(\varepsilon))
-        \right].
+        \varepsilon_i\sim\Normal(0,1),
+        \qquad \boxed{X_i=\mu+\sigma\varepsilon_i\sim q_\theta.}
       \]
-    \item Differentiate through the complete sampled objective:
+    \item \textbf{Hold $\varepsilon_i$ fixed during backpropagation:}
+      for differentiable $R$,
       \[
-        \nabla_\theta J_{\Tau}
-        =\E_{\varepsilon}\!\left[
-          \nabla_\theta\left(
-            R(g_\theta(\varepsilon))
-            -\Tau\log q_\theta(g_\theta(\varepsilon))
-          \right)
-        \right].
+        \frac{\partial R(X_i)}{\partial\mu}=R'(X_i),
+        \qquad
+        \frac{\partial R(X_i)}{\partial\sigma}
+        =R'(X_i)\,\varepsilon_i.
       \]
-    \item For a Gaussian, use its analytic entropy:
+    \item \textbf{Gaussian VI loss} (samples via \texttt{q.rsample()}):
       \[
         \boxed{\widehat L_{\mathrm{path}}
-        =-\frac1N\sum_{i=1}^{N}R(g_\theta(\varepsilon_i))
-         -\Tau\mathcal H[q_\theta].}
+        =-\frac1N\sum_{i=1}^{N}R(\mu+\sigma\varepsilon_i)
+         -\Tau\underbrace{\tfrac12\log(2\pi e\sigma^2)}_{
+           \text{Gaussian entropy }\mathcal H[q_\theta]}.}
       \]
   \end{itemize}
-  \uncover<4->{\scriptsize
-    Requires reparameterizable $q_\theta$ and differentiable $R(x)$; usually
-    lower variance than the log-derivative estimator.}
 \end{frame}
 
 \begin{frame}{Log-derivative trick for variational inference}
@@ -695,8 +696,8 @@
 \begin{frame}[fragile]{Lesson 1 exercise: starter code}
   \centering
   \uncover<1->{%
-    \href{run:../L2-MaxEntMin/gaussian_policy_student.ipynb}
-      {\textcolor{BrandBlue}{\texttt{L2-MaxEntMin/gaussian\_policy\_student.ipynb}}}
+    \href{run:../L1-VariationalInference/gaussian_policy_student.ipynb}
+      {\textcolor{BrandBlue}{\texttt{L1-VariationalInference/gaussian\_policy\_student.ipynb}}}
   }
   \vspace{0.20cm}
 
@@ -733,8 +734,8 @@ def log_derivative_maxent_loss(
 \begin{frame}[fragile]{Lesson 1 exercise: solution}
   \centering
   \uncover<1->{%
-    \href{run:../L2-MaxEntMin/gaussian_policy_solution.ipynb}
-      {\textcolor{BrandBlue}{\texttt{L2-MaxEntMin/gaussian\_policy\_solution.ipynb}}}
+    \href{run:../L1-VariationalInference/gaussian_policy_solution.ipynb}
+      {\textcolor{BrandBlue}{\texttt{L1-VariationalInference/gaussian\_policy\_solution.ipynb}}}
   }
   \vspace{0.12cm}
 
@@ -776,7 +777,7 @@ return -(centered * log_q).mean()
   retaining finite variance. The dashed line marks the current optimization step.}
 \end{frame}
 
-\section{Lesson 2: Reinforcement learning as variational inference}
+\section{Lesson 2: Diffusion samplers}
 
 \begin{frame}[plain]
   \begin{tikzpicture}[remember picture,overlay]
@@ -786,12 +787,420 @@ return -(centered * log_q).mean()
     \node[anchor=center,text=white,align=center]
       at ([xshift=0.65cm]current page.center)
       {{\bfseries\fontsize{16}{18}\selectfont LESSON 2}\\[0.24cm]
+       {\bfseries\fontsize{25}{28}\selectfont Diffusion Samplers}};
+  \end{tikzpicture}
+  \plainlogos
+\end{frame}
+
+\begin{frame}{Problem statement: make the variational family multimodal}
+  \small
+  \begin{columns}[T,onlytextwidth]
+    \column{0.47\textwidth}
+      \begin{block}<1->{The limitation}
+        $p_{\Tau}(x)$ may have separated modes; a Gaussian $q_\theta(x)$ has one.
+      \end{block}
+      \begin{block}<2->{Diffusion variational distribution}
+        \[
+          \begin{gathered}
+            X^K\sim\Normal(0,\nu^2I),\qquad \nu>0,\\[-0.02cm]
+            X^K\longrightarrow\cdots\longrightarrow X^0\sim q_\theta.
+          \end{gathered}
+        \]
+        Simple transitions compose into a multimodal endpoint.
+      \end{block}
+    \column{0.49\textwidth}
+      \centering
+      \begin{tikzpicture}[x=0.60cm,y=0.72cm,font=\scriptsize]
+        \uncover<1->{%
+          \node[anchor=west,font=\bfseries,text=Ink] at (0.25,4.48)
+            {Gaussian variational family};
+          \draw[->,Slate] (0.25,2.35) -- (6.55,2.35) node[right,text=Ink] {$x$};
+          \draw[TrailDark,line width=1.5pt,dashed,domain=0.35:6.25,
+                samples=100,smooth]
+            plot (\x,{2.43
+              +0.82*exp(-4.5*(\x-1.20)^2)
+              +1.12*exp(-5.0*(\x-3.20)^2)
+              +0.92*exp(-4.8*(\x-5.25)^2)});
+          \path[fill=BrandBlue,fill opacity=0.16]
+            (0.35,2.35) -- plot[domain=0.35:6.25,samples=90,smooth]
+            (\x,{2.35+0.94*exp(-1.45*(\x-3.18)^2)}) -- (6.25,2.35) -- cycle;
+          \draw[BrandBlue,line width=1.8pt,domain=0.35:6.25,samples=90,smooth]
+            plot (\x,{2.35+0.94*exp(-1.45*(\x-3.18)^2)});
+          \node[text=BrandBlue] at (5.45,3.55) {one-mode $q_\theta$};
+          \node[text=TrailDark] at (5.35,2.62) {$p_{\Tau}$};
+        }
+
+        \uncover<2->{%
+          \node[anchor=west,font=\bfseries,text=Ink] at (0.25,1.82)
+            {Diffusion variational family};
+          \draw[->,Slate] (0.25,-0.30) -- (6.55,-0.30) node[right,text=Ink] {$x$};
+          \draw[TrailDark,line width=1.5pt,dashed,domain=0.35:6.25,
+                samples=100,smooth]
+            plot (\x,{-0.22
+              +0.82*exp(-4.5*(\x-1.20)^2)
+              +1.12*exp(-5.0*(\x-3.20)^2)
+              +0.92*exp(-4.8*(\x-5.25)^2)});
+          \path[fill=BrandBlue,fill opacity=0.16]
+            (0.35,-0.30) -- plot[domain=0.35:6.25,samples=100,smooth]
+            (\x,{-0.30
+              +0.76*exp(-4.2*(\x-1.20)^2)
+              +1.04*exp(-4.8*(\x-3.20)^2)
+              +0.86*exp(-4.5*(\x-5.25)^2)}) -- (6.25,-0.30) -- cycle;
+          \draw[BrandBlue,line width=1.8pt,domain=0.35:6.25,
+                samples=100,smooth]
+            plot (\x,{-0.30
+              +0.76*exp(-4.2*(\x-1.20)^2)
+              +1.04*exp(-4.8*(\x-3.20)^2)
+              +0.86*exp(-4.5*(\x-5.25)^2)});
+          \node[text=BrandBlue] at (5.15,1.32) {multimodal $q_\theta$};
+          \node[text=TrailDark] at (5.35,-0.02) {$p_{\Tau}$};
+        }
+      \end{tikzpicture}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Diffusion models: variance-preserving noising in discrete time}
+  \footnotesize
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{columns}[c,onlytextwidth]
+    \column{0.51\textwidth}
+      \begin{itemize}
+        \setlength{\itemsep}{0.20cm}
+        \item<1-> \textbf{Start with data} $X^0\sim p_0$; choose small noise steps:
+          \[
+            \delta_k=\beta_k\Delta_k>0,
+            \qquad \varepsilon_k\overset{\mathrm{iid}}{\sim}\Normal(0,1).
+          \]
+        \item<2-> \textbf{Shrink the signal and add Gaussian noise:}
+          \[
+            \begin{aligned}
+              X^k&=\underbrace{(1-\tfrac12\delta_{k-1})X^{k-1}}_{\text{shrink}}\\
+                 &\quad+\underbrace{\nu\sqrt{\delta_{k-1}}\,\varepsilon_{k-1}}_{\text{add noise}}.
+            \end{aligned}
+          \]
+        \item<3-> \textbf{Enough small steps give a Gaussian prior:}
+          \[
+            p_K\approx q_K=\Normal(0,\nu^2).
+          \]
+          Near the prior, shrinkage balances noise;
+          $\nu$ sets its standard deviation.
+      \end{itemize}
+    \column{0.47\textwidth}
+      \centering
+      \animategraphics[autoplay,loop,poster=first,width=\linewidth]
+        {10}{assets/vp_diffusion_1d/frame-}{0}{79}
+      \begin{itemize}
+        \item \scriptsize $\nu=1$, $\delta_k=0.02$, $K=600$.
+      \end{itemize}
+  \end{columns}
+  \vfill
+  {\tiny\color{Slate}
+    The discrete update preserves the prior approximately for small steps.}
+\end{frame}
+
+\begin{frame}{Reverse diffusion: from optimal to learned score}
+  \footnotesize
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \setlength{\itemsep}{0.20cm}
+    \item \textbf{Reverse step with the optimal score}
+      $s_k^*(x)=\partial_x\log p_k(x)$:
+      \[
+        X^{k-1}=(1+\tfrac12\delta_k)X^k
+          +\nu^2\delta_k\,s_k^*(X^k)
+          +\nu\sqrt{\delta_k}\,\varepsilon_k,
+        \qquad\varepsilon_k\sim\Normal(0,1).
+      \]
+    \item \textbf{The optimal score is intractable in general:}
+      approximate it with a neural network,
+      \[
+        u_{\Psi}(x,k)\approx s_k^*(x).
+      \]
+    \item \textbf{Plug in the learned score:}
+      \[
+        \boxed{X^{k-1}=(1+\tfrac12\delta_k)X^k
+          +\nu^2\delta_k\,{\color{BrandBlue}u_{\Psi}(X^k,k)}
+          +\nu\sqrt{\delta_k}\,\varepsilon_k.}
+      \]
+    \item \textbf{Generate from the Gaussian prior:}
+      \[
+        \underbrace{X^K\sim\Normal(0,\nu^2)}_{\text{Gaussian prior}}
+        \xrightarrow{q_\theta}\;X^{K-1}
+        \xrightarrow{q_\theta}\;\cdots
+        \xrightarrow{q_\theta}\;
+        \underbrace{X^0\sim q_\theta}_{\text{generated sample}}.
+      \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{From diffusion models to diffusion samplers}
+  \small
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \setlength{\itemsep}{0.24cm}
+    \item \textbf{Diffusion models:} learn from samples of the target distribution.
+    \item \textbf{Our diffusion sampler:} only the cost $C(x)$ is available.
+      \[
+        p_{\Tau}(x)=\frac{e^{-C(x)/\Tau}}{Z_{\Tau}},
+        \qquad \min_\theta\KL\!\left(q_\theta(x^0)\|p_{\Tau}(x^0)\right).
+      \]
+    \item \textbf{Also learnable:} the prior $q_{\phi,K}$ and diffusion
+      coefficients $\beta_{0:K}$.\\
+      {\footnotesize Exercise: optional coefficient learning; fixed Gaussian prior.}
+    \item \textbf{The obstacle:} the marginal distribution
+      $q_\theta(x^0)$ is intractable to evaluate.
+      \[
+        \underbrace{q_\theta(x^0)}_{\text{marginal}}
+        =\int\underbrace{q_\theta(x^0,z)}_{\text{joint}}\,dz.
+      \]
+      Keep the latent variable $Z$ to work with a tractable joint distribution.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Data-processing inequality: introduce a latent variable $Z$}
+  \small
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \setlength{\itemsep}{0.20cm}
+    \item \textbf{Joint distributions over $(X,Z)$ give marginals over $X$:}
+      \[
+        q(x)=\int q(x,z)\,dz,
+        \qquad p(x)=\int p(x,z)\,dz.
+      \]
+    \item \textbf{KL chain rule:}
+      \[
+        \begin{aligned}
+          \KL(q(x,z)\|p(x,z))
+          &=\KL(q(x)\|p(x))\\
+          &\quad+\underbrace{\E_{X\sim q}\!\left[
+            \KL(q(z\mid X)\|p(z\mid X))\right]}_{\geq 0}.
+        \end{aligned}
+      \]
+    \item \textbf{DPI: discarding $Z$ cannot increase KL.}
+      \[
+        \boxed{\KL(q(x)\|p(x))\leq\KL(q(x,z)\|p(x,z)).}
+      \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Apply the DPI to a diffusion path}
+  \footnotesize
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \setlength{\itemsep}{0.20cm}
+    \item \textbf{Substitute $X=X^0$ and $Z=X^{1:K}$:}
+      \[
+        \boxed{\KL(q_\theta(x^0)\|p_{\Tau}(x^0))
+        \leq \KL(q_\theta(x^{0:K})\|p_{\Tau}(x^{0:K}))}
+      \]
+    \item \textbf{The joint distributions are the full paths:}
+      \[
+        \begin{aligned}
+          q_\theta(x^{0:K})
+            &=q_K(x^K)\prod_{k=1}^{K}q_\theta(x^{k-1}\mid x^k),\\
+          p_{\Tau}(x^{0:K})
+            &=p_{\Tau}(x^0)\prod_{k=1}^{K}p(x^k\mid x^{k-1}).
+        \end{aligned}
+      \]
+    \item \textbf{Trainable loss, up to $\Tau\log Z_{\Tau}$:}
+      \[
+        L_{\mathrm{path}}
+        =\E_{q_\theta}\!\left[
+        -R(x^0)+\Tau\log q_K(x^K)
+        +\Tau\sum_{k=1}^{K}\log
+        \frac{q_\theta(x^{k-1}\mid x^k)}
+             {p(x^k\mid x^{k-1})}\right]
+      \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Optional Langevin preconditioning}
+  \begin{itemize}[<+->]
+    \item \textbf{Use the target gradient:}
+      \[
+        \nabla_x\log p_{\Tau}(x)
+        =-\frac{\nabla_x C(x)}{\Tau}
+        =\frac{\nabla_x R(x)}{\Tau}.
+      \]
+    \item \textbf{Parameterize the score:}
+      \[
+        \boxed{u_\Psi(x,k)=-\frac{x}{\nu^2}
+          +\mathrm{NN}_1(k,x)
+          +\mathrm{NN}_2(k)\odot\nabla_x\log p_{\Tau}(x).}
+      \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Lesson 2 exercise: starter code}
+  \centering
+  \uncover<1->{%
+    \href{run:../L2-DiffusionSamplers/diffusion_sampler_student.ipynb}
+      {\textcolor{BrandBlue}{\texttt{L2-DiffusionSamplers/diffusion\_sampler\_student.ipynb}}}
+  }
+  \vspace{0.10cm}
+
+  \begin{columns}[T,onlytextwidth]
+    \column{0.49\textwidth}
+      \begin{block}<2->{A. Forward kernel TODOs}
+\fontsize{5.8}{6.5}\selectfont
+\begin{verbatim}
+def forward_sde_step(previous_state, delta,
+                     reparameterize, noise=None):
+    # delta = delta_{k-1}
+    # TODO: mean, std, and sample
+    raise NotImplementedError(...)
+
+def forward_kernel_log_prob(previous_state,
+                            noisy_state, delta):
+    # TODO: reconstruct p(x^k | x^{k-1})
+    raise NotImplementedError(...)
+\end{verbatim}
+      \end{block}
+    \column{0.49\textwidth}
+      \begin{block}<3->{B. Reverse kernel TODOs}
+\fontsize{5.8}{6.5}\selectfont
+\begin{verbatim}
+def reverse_sde_step(score_network, noisy_state,
+                     step_index, delta, num_steps,
+                     reparameterize, noise=None):
+    # step_index = k; delta = delta_k
+    # TODO: score, mean, std, and sample
+    raise NotImplementedError(...)
+
+def reverse_kernel_log_prob(score_network,
+    previous_state, noisy_state, step_index,
+    delta, num_steps):
+    # TODO: reconstruct q_theta(x^{k-1} | x^k)
+    raise NotImplementedError(...)
+\end{verbatim}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Lesson 2 exercise: solution}
+  \centering
+  \uncover<1->{%
+    \href{run:../L2-DiffusionSamplers/diffusion_sampler_solution.ipynb}
+      {\textcolor{BrandBlue}{\texttt{L2-DiffusionSamplers/diffusion\_sampler\_solution.ipynb}}}
+  }
+  \vspace{0.06cm}
+
+  \begin{columns}[T,onlytextwidth]
+    \column{0.49\textwidth}
+      \begin{block}<2->{A. Forward kernel solution}
+\fontsize{6.2}{7.0}\selectfont
+\begin{verbatim}
+# delta = delta_{k-1}
+mean = (1.0 - 0.5 * delta) * previous_state
+std = PRIOR_STD * delta.sqrt()
+if noise is not None:
+    sample = mean + std * noise
+    return sample if reparameterize else sample.detach()
+q = Independent(Normal(mean, std), 1)
+if reparameterize:
+    return q.rsample()
+return q.sample()
+
+# forward_kernel_log_prob
+mean = (1.0 - 0.5 * delta) * previous_state
+p = Independent(Normal(mean,
+    PRIOR_STD * delta.sqrt()), 1)
+return p.log_prob(noisy_state)
+\end{verbatim}
+      \end{block}
+    \column{0.49\textwidth}
+      \begin{block}<3->{B. Reverse kernel solution}
+\fontsize{6.2}{7.0}\selectfont
+\begin{verbatim}
+# step_index = k; delta = delta_k
+score = score_network(noisy_state,
+                      step_index, num_steps)
+mean = (1.0 + 0.5 * delta) * noisy_state
+mean = mean + delta * PRIOR_STD**2 * score
+std = PRIOR_STD * delta.sqrt()
+if noise is not None:
+    sample = mean + std * noise
+    return sample if reparameterize else sample.detach()
+q = Independent(Normal(mean, std), 1)
+if reparameterize:
+    return q.rsample()
+return q.sample()
+
+# reverse_kernel_log_prob: same mean and std
+return q.log_prob(previous_state)
+\end{verbatim}
+      \end{block}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{GMM-40 training: estimator $\times$ Langevin preconditioning}
+  \centering
+  \animategraphics[autoplay,loop,poster=last,height=0.68\textheight]
+    {1.5}{assets/l4_training/frame-}{0}{20}
+  \vspace{0.04cm}
+
+  {\scriptsize Same seed, noise, schedule, and budget in all four runs.
+  The right column shows fixed-noise path loss; dashed lines mark the current step.}
+\end{frame}
+
+\section{Lesson 3: Reinforcement learning as variational inference}
+
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[Navy] (current page.south west) rectangle (current page.north east);
+    \fill[Sky] (current page.south west) rectangle
+      ([xshift=1.3cm]current page.north west);
+    \node[anchor=center,text=white,align=center]
+      at ([xshift=0.65cm]current page.center)
+      {{\bfseries\fontsize{16}{18}\selectfont LESSON 3}\\[0.24cm]
        {\bfseries\fontsize{24}{27}\selectfont RL as Variational Inference}};
   \end{tikzpicture}
   \plainlogos
 \end{frame}
 
-\begin{frame}{Problem statement: optimize a distribution over trajectories}
+\begin{frame}{Reward defines a target over trajectories}
+  \small
+  \only<1->{%
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[anchor=north east,fill=white,rounded corners=1.2pt,
+            inner xsep=2.8pt,inner ysep=1.8pt]
+        at ([xshift=-0.16cm,yshift=-0.10cm]current page.north east)
+        {\includegraphics[height=0.52cm]{assets/logos/tum_logo.png}};
+    \end{tikzpicture}%
+  }
+  \begin{block}<1->{Unnormalized joint target}
+    For states $s_t$, actions $a_t$, horizon $T$, and temperature $\Tau>0$,
+    \[
+      \widetilde\pi(a_{0:T},s_{0:T+1})
+      :=p(s_0)\prod_{t=0}^{T}
+      p(s_{t+1}\mid s_t,a_t)
+      \exp\!\left(R_{\mathrm{env}}(s_t,a_t)/\Tau\right).
+    \]
+    Here $p(s_0)$ is the initial-state density and
+    $p(s_{t+1}\mid s_t,a_t)$ describes the environment dynamics.
+  \end{block}
+  \uncover<2->{%
+    Marginalize the states, then normalize:
+    \[
+      \widetilde\pi(a_{0:T})
+      :=\int\widetilde\pi(a_{0:T},s_{0:T+1})\,ds_{0:T+1},
+      \qquad
+      \pi(a_{0:T}):=\frac{\widetilde\pi(a_{0:T})}{\mathcal Z}.
+    \]
+  }
+  \begin{alertblock}<3->{Why this is the target}
+    $\prod_t\exp(R_{\mathrm{env}}/\Tau)=
+    \exp(\sum_tR_{\mathrm{env}}/\Tau)$, so high-return trajectories receive
+    exponentially more probability.
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{A policy induces a distribution over trajectories}
   \footnotesize
   \begin{columns}[T,onlytextwidth]
     \column{0.50\textwidth}
@@ -806,16 +1215,12 @@ return -(centered * log_q).mean()
         \]
       \end{block}
       \uncover<2->{%
-        \textbf{Maximum-entropy objective:}\quad
-        $\boxed{\max_\theta\;\mathcal J_T(\theta)}$
-        \vspace{-0.08cm}
-        {\footnotesize
-        \[
-          \mathcal J_T(\theta)=\E_{q_\theta}\!\left[
-          \sum_{t=0}^{T}\!\left(R_{\mathrm{env}}(s_t,a_t)
-          -\Tau\log q_\theta(a_t\mid s_t)\right)\right].
-        \]
-        }
+        \begin{block}{Fit the reward-defined target}
+          \[
+            \min_\theta\;\KL\!\left(
+              q_\theta(a_{0:T})\|\pi(a_{0:T})\right).
+          \]
+        \end{block}
       }
       \uncover<3->{\textcolor{BrandBlue}{\textbf{Conceptual step:}}
         the sample $x$ is now an entire trajectory $\tau$.}
@@ -862,42 +1267,7 @@ return -(centered * log_q).mean()
   \end{columns}
 \end{frame}
 
-\begin{frame}{Reward defines a target over trajectories}
-  \small
-  \only<1->{%
-    \begin{tikzpicture}[remember picture,overlay]
-      \node[anchor=north east,fill=white,rounded corners=1.2pt,
-            inner xsep=2.8pt,inner ysep=1.8pt]
-        at ([xshift=-0.16cm,yshift=-0.10cm]current page.north east)
-        {\includegraphics[height=0.52cm]{assets/logos/tum_logo.png}};
-    \end{tikzpicture}%
-  }
-  \begin{block}<1->{Unnormalized joint target}
-    With temperature $\Tau>0$,
-    \[
-      \widetilde\pi(a_{0:T},s_{0:T+1})
-      :=p(s_0)\prod_{t=0}^{T}
-      p(s_{t+1}\mid s_t,a_t)
-      \exp\!\left(R_{\mathrm{env}}(s_t,a_t)/\Tau\right).
-    \]
-  \end{block}
-  \uncover<2->{%
-    Marginalize the states, then normalize:
-    \[
-      \widetilde\pi(a_{0:T})
-      :=\int\widetilde\pi(a_{0:T},s_{0:T+1})\,ds_{0:T+1},
-      \qquad
-      \pi(a_{0:T}):=\frac{\widetilde\pi(a_{0:T})}{\mathcal Z}.
-    \]
-  }
-  \begin{alertblock}<3->{Why this is the target}
-    $\prod_t\exp(R_{\mathrm{env}}/\Tau)=
-    \exp(\sum_tR_{\mathrm{env}}/\Tau)$, so high-return trajectories receive
-    exponentially more probability.
-  \end{alertblock}
-\end{frame}
-
-\begin{frame}{First DPI: actions to state--action trajectories}
+\begin{frame}{DPI: actions to state--action trajectories}
   \only<1->{%
     \begin{tikzpicture}[remember picture,overlay]
       \node[anchor=north east,fill=white,rounded corners=1.2pt,
@@ -1010,80 +1380,107 @@ return -(centered * log_q).mean()
 
 \begin{frame}{Infinite horizon: now let $T\to\infty$}
   \small
-  \begin{block}<1->{Infinite-horizon objective}
-    Taking the cutoff $T\to\infty$ gives
-    \[
-      \boxed{
-      \mathcal J(\theta)=\E_{q_\theta}\!\left[
-      \sum_{t=0}^{\infty}\gamma^t
-      \left(R_{\mathrm{env}}(s_t,a_t)
-      -\Tau\log q_\theta(a_t\mid s_t)\right)
-      \right]}.
-    \]
-  \end{block}
-  \begin{alertblock}<2->{Key point}
-    Discounting does not change the reward--entropy trade-off at a fixed time:
-    the same factor $\gamma^t$ multiplies both terms.
-  \end{alertblock}
-\end{frame}
-
-\begin{frame}{The stationary objective yields a local VI update}
-  \small
-  \only<1->{%
-    \begin{tikzpicture}[remember picture,overlay]
-      \node[anchor=north east,fill=white,rounded corners=1.2pt,
-            inner xsep=2.8pt,inner ysep=1.8pt]
-        at ([xshift=-0.16cm,yshift=-0.10cm]current page.north east)
-        {\includegraphics[height=0.52cm]{assets/logos/tum_logo.png}};
-    \end{tikzpicture}%
-  }
   \begin{itemize}[<+->]
-    \item \textbf{Normalized discounted state visitation:}
+    \item \textbf{We recover the standard maximum-entropy RL objective:}
       \[
-        d^{q_{\thetar}}(s')
-        :=(1-\gamma)\sum_{t=0}^{\infty}\gamma^t
-        \Pr_{q_{\thetar}}(s_t=s').
+        \boxed{
+        \mathcal J(\theta)=\E_{q_\theta}\!\left[
+        \sum_{t=0}^{\infty}\gamma^t
+        \left(R_{\mathrm{env}}(s_t,a_t)
+        -\Tau\log q_\theta(a_t\mid s_t)\right)
+        \right].}
       \]
-    \item \textbf{Local soft policy-improvement target:}
-      \[
-        \pi_Q^{q_{\thetar}}(a\mid s')
-        :=\frac{\exp\!\left(Q^{q_{\thetar}}(s',a)/\Tau\right)}
-        {Z_Q^{q_{\thetar}}(s')}.
-      \]
-    \item \textbf{Stationary local surrogate:}
-      \[
-        \mathcal L_{\mathrm{ME}}(\theta)
-        =\frac{\Tau}{1-\gamma}\,
-        \E_{s'\sim d^{q_{\thetar}}}\!\left[
-        \KL\!\left(q_\theta(\cdot\mid s')\|\pi_Q^{q_{\thetar}}(\cdot\mid s')\right)
-        \right].
-      \]
-    \item $Q^{q_{\thetar}}$ and $d^{q_{\thetar}}$ remain frozen during the actor update.
+    \item \textbf{The familiar MaxEnt framework used by Soft Actor-Critic.}\\
+      \href{https://arxiv.org/abs/1801.01290}
+        {\textcolor{BrandBlue}{Haarnoja et al. (2018), \emph{Soft Actor-Critic}.}}
+    \item \textbf{Reward $+$ policy entropy:} both discounted by $\gamma^t$;
+      $\Tau$ controls their trade-off.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{The stationary soft Bellman equations}
+\begin{frame}{Apply the maximum-entropy policy-gradient theorem}
+  \small
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \item \textbf{Discounted visitation under the current policy:}
+      \[
+        d^{q_\theta}(s)
+        :=(1-\gamma)\sum_{t=0}^{\infty}\gamma^t
+        \Pr_{q_\theta}(s_t=s).
+      \]
+    \item \textbf{The policy-gradient theorem applies:}
+      \[
+        \boxed{\nabla_\theta\mathcal J(\theta)
+        =\frac{1}{1-\gamma}
+        \E_{\substack{s\sim d^{q_\theta}\\a\sim q_\theta(\cdot\mid s)}}\!\left[
+        \nabla_\theta\log q_\theta(a\mid s)
+        \big(Q^{q_\theta}(s,a)-\Tau\log q_\theta(a\mid s)\big)
+        \right].}
+      \]
+      $Q^{q_\theta}$ includes future rewards \emph{and} future entropy.
+    \item \textbf{No differentiation through visitation or the critic:}
+      the theorem accounts for their effect on the return.
+  \end{itemize}
+\end{frame}
+
+% Local gradient identity: ICLR2027 draft, Sec. 2.1, Eqs. (2)--(3).
+\begin{frame}{From policy gradients to a local VI surrogate}
+  \footnotesize
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{itemize}[<+->]
+    \setlength{\itemsep}{0.20cm}
+    \item \textbf{Freeze the rollout policy $q_{\thetar}$, its critic and visitation:}
+      \[
+        Q_r:=Q^{q_{\thetar}},\qquad d_r:=d^{q_{\thetar}},\qquad
+        \pi_Q^r(a\mid s)\propto\exp\!\left(Q_r(s,a)/\Tau\right).
+      \]
+    \item \textbf{Reverse the log-derivative trick to obtain the actor loss:}
+      \[
+        \begin{aligned}
+          \mathcal L_{\mathrm{ME}}(\theta)
+          &=\frac{1}{1-\gamma}
+            \E_{\substack{s\sim d_r\\a\sim q_\theta(\cdot\mid s)}}\!\left[
+            \Tau\log q_\theta(a\mid s)-Q_r(s,a)\right]\\
+          &=\frac{\Tau}{1-\gamma}\,
+            \E_{s\sim d_r}\!\left[
+            \KL\!\left(q_\theta(\cdot\mid s)\|\pi_Q^r(\cdot\mid s)\right)
+            \right]+\mathrm{const}.
+        \end{aligned}
+      \]
+    \item \textbf{Exact at the first iterate on this rollout batch, $\theta^{(0)}=\thetar$:}
+      \[
+        \boxed{\left.\nabla_\theta\mathcal L_{\mathrm{ME}}(\theta)\right|_{\theta=\thetar}
+        =-\left.\nabla_\theta\mathcal J(\theta)\right|_{\theta=\thetar}.}
+      \]
+      Exact values and expectations; later actor iterates generally use an approximate gradient.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{The soft Bellman equations provide the critic}
   \small
   \begin{columns}[T,onlytextwidth]
     \column{0.58\textwidth}
-      \begin{block}<1->{Action value}
+      \begin{block}<1->{Evaluate the rollout policy: action value}
         \[
-          Q^{q_\theta}(s,a)
+          Q_r(s,a)
           =R_{\mathrm{env}}(s,a)
-          +\gamma\,\E_{s'\sim p}
-          \!\left[V^{q_\theta}(s')\right].
+          +\gamma\,\E_{s'\sim p(\cdot\mid s,a)}
+          \!\left[V_r(s')\right].
         \]
       \end{block}
       \begin{block}<2->{Soft state value}
         \[
-          V^{q_\theta}(s)
-          =\E_{a\sim q_\theta(\cdot\mid s)}\!\left[
-          Q^{q_\theta}(s,a)-\Tau\log q_\theta(a\mid s)
+          V_r(s)
+          =\E_{a\sim q_{\thetar}(\cdot\mid s)}\!\left[
+          Q_r(s,a)-\Tau\log q_{\thetar}(a\mid s)
           \right].
         \]
       \end{block}
-      \begin{alertblock}<3->{Roles remain distinct}
-        $\gamma$: future horizon. \qquad $\Tau$: entropy weight.
+      \begin{alertblock}<3->{Policy evaluation $\to$ actor updates}
+        $V_r:=V^{q_{\thetar}}$. Estimate the soft critic under $q_{\thetar}$,
+        then freeze it while optimizing the local actor loss.
       \end{alertblock}
 
     \column{0.38\textwidth}
@@ -1095,7 +1492,7 @@ return -(centered * log_q).mean()
           \node[state] (s) at (0.70,2.35) {$s$};
           \node[state] (sp) at (3.70,2.35) {$s'$};
           \draw[-{Stealth[length=7pt]},BrandBlue,line width=1.8pt]
-            (s) -- node[above,text=Ink] {$a\sim q_\theta(\cdot\mid s)$} (sp);
+            (s) -- node[above,text=Ink] {$a\sim q_{\thetar}(\cdot\mid s)$} (sp);
           \node[fill=Trail,text=white,rounded corners=2pt,font=\bfseries]
             at (2.20,1.62) {$R_{\mathrm{env}}(s,a)$};
         }
@@ -1106,35 +1503,31 @@ return -(centered * log_q).mean()
         }
         \uncover<3->{%
           \node[text=BrandBlue,font=\bfseries] at (3.05,3.45)
-            {$\gamma\,V^{q_\theta}(s')$};
+            {$\gamma\,V_r(s')$};
           \node[text=TrailDark,font=\bfseries,align=center] at (2.18,0.65)
-            {$-\Tau\log q_\theta(a\mid s)$\\rewards entropy};
+            {$-\Tau\log q_{\thetar}(a\mid s)$\\rewards entropy};
         }
       \end{tikzpicture}
   \end{columns}
 \end{frame}
 
-\begin{frame}{Why REPPO needs a KL trust region}
+\begin{frame}{Multiple actor updates require a trust region}
   \footnotesize
   \begin{columns}[T,onlytextwidth]
     \column{0.62\textwidth}
-      \begin{block}{TRPO monotonic-improvement bound}
-        The surrogate freezes visitation under the rollout policy
-        $q_{\thetar}$. For some $C>0$,
-        \[
-          \boxed{%
-          \eta(q_\theta)
-          \geq
-          L_{q_{\thetar}}(q_\theta)
-          -C\,D_{\mathrm{KL}}^{\max}
-          \!\left(q_{\thetar}\,\middle\|\,q_\theta\right)}.
-        \]
+      \begin{block}{Several updates on the same rollout batch}
+        \begin{itemize}
+          \item Start at $\theta^{(0)}=\thetar$; freeze $d_r$ and $Q_r$.
+          \item Take several steps on $\mathcal L_{\mathrm{ME}}$.
+          \item Keep every candidate close to the \textbf{original rollout policy}.
+          \item Later gradients remain a local approximation.
+        \end{itemize}
       \end{block}
 
-      \begin{alertblock}{Consequence}
-        A surrogate improvement alone is insufficient. Keeping the new policy
-        close to the rollout policy controls the approximation error and yields
-        the monotonic-improvement guarantee.
+      \begin{alertblock}{TRPO improvement condition}
+        Accept a candidate when its surrogate gain exceeds the bound's
+        distribution-shift penalty. A sufficiently small trust region controls
+        that error; then refresh rollouts and the critic.
       \end{alertblock}
 
     \column{0.34\textwidth}
@@ -1157,7 +1550,7 @@ return -(centered * log_q).mean()
           at (3.18,3.08) {$q_\theta$};
         \draw[flow,BrandBlue] (2.20,2.62) to[bend left=18] (3.08,3.01);
         \node[text=BrandBlue,font=\bfseries,align=center]
-          at (2.70,1.12) {surrogate remains\\reliable};
+          at (2.70,0.82) {surrogate remains\\reliable};
         \node[text=BrandBlue,font=\bfseries] at (4.65,4.18) {$\checkmark$};
 
         \fill[TrailDark] (5.57,1.05) circle (3.2pt);
@@ -1171,8 +1564,7 @@ return -(centered * log_q).mean()
 
   \centering
   \(\boxed{%
-    \widehat D_{\mathrm{FKL}}(s)
-    =\KL\!\left(q_{\thetar}(\cdot\mid s)\|q_\theta(\cdot\mid s)\right)
+    \max_s\KL\!\left(q_{\thetar}(\cdot\mid s)\|q_{\theta^{(j)}}(\cdot\mid s)\right)
     \leq\delta_{\mathrm{KL}}}\)
   \qquad
   \textbf{rollout $\boldsymbol{\to}$ current}
@@ -1180,7 +1572,9 @@ return -(centered * log_q).mean()
   {\scriptsize
     \href{https://arxiv.org/abs/1502.05477}
       {\textcolor{BrandBlue}{Schulman et al. (2015),
-      \emph{Trust Region Policy Optimization}.}}}
+      \emph{Trust Region Policy Optimization}.}}\\
+    Population guarantees use exact values and worst-state bounds;
+    sampled KL constraints are a practical approximation.}
 \end{frame}
 
 \begin{frame}{Example algorithm: REPPO}
@@ -1364,429 +1758,6 @@ return -(centered * log_q).mean()
   REPPO produces one diagonal family of trajectories. The optimal reference
   samples either reward-maximizing turn, $-45^\circ$ or $+45^\circ$, at every
   step: every action is optimal, but the resulting behavior remains diverse.
-\end{frame}
-
-\section{Lesson 3: Diffusion samplers}
-
-\begin{frame}[plain]
-  \begin{tikzpicture}[remember picture,overlay]
-    \fill[Navy] (current page.south west) rectangle (current page.north east);
-    \fill[Sky] (current page.south west) rectangle
-      ([xshift=1.3cm]current page.north west);
-    \node[anchor=center,text=white,align=center]
-      at ([xshift=0.65cm]current page.center)
-      {{\bfseries\fontsize{16}{18}\selectfont LESSON 3}\\[0.24cm]
-       {\bfseries\fontsize{25}{28}\selectfont Diffusion Samplers}};
-  \end{tikzpicture}
-  \plainlogos
-\end{frame}
-
-\begin{frame}{Problem statement: make the variational family multimodal}
-  \small
-  \begin{columns}[T,onlytextwidth]
-    \column{0.47\textwidth}
-      \begin{block}<1->{The limitation}
-        $p_{\Tau}(x)$ may have separated modes; a Gaussian $q_\theta(x)$ has one.
-      \end{block}
-      \begin{block}<2->{Diffusion variational distribution}
-        \[
-          \begin{gathered}
-            X^K\sim\Normal(0,\nu^2I),\qquad \nu>0,\\[-0.02cm]
-            X^K\longrightarrow\cdots\longrightarrow X^0\sim q_\theta.
-          \end{gathered}
-        \]
-        Simple transitions compose into a multimodal endpoint.
-      \end{block}
-      \uncover<3->{\textbf{Fit the flexible endpoint:}}
-      \uncover<3->{%
-        \vspace{-0.12cm}
-        \[
-          \boxed{\theta^*\in\arg\min_\theta
-          \KL\big(q_\theta(x^0)\|p_{\Tau}(x)\big)}.
-        \]
-      }
-
-    \column{0.49\textwidth}
-      \centering
-      \begin{tikzpicture}[x=0.60cm,y=0.72cm,font=\scriptsize]
-        \uncover<1->{%
-          \node[anchor=west,font=\bfseries,text=Ink] at (0.25,4.48)
-            {Gaussian variational family};
-          \draw[->,Slate] (0.25,2.35) -- (6.55,2.35) node[right,text=Ink] {$x$};
-          \draw[TrailDark,line width=1.5pt,dashed,domain=0.35:6.25,
-                samples=100,smooth]
-            plot (\x,{2.43
-              +0.82*exp(-4.5*(\x-1.20)^2)
-              +1.12*exp(-5.0*(\x-3.20)^2)
-              +0.92*exp(-4.8*(\x-5.25)^2)});
-          \path[fill=BrandBlue,fill opacity=0.16]
-            (0.35,2.35) -- plot[domain=0.35:6.25,samples=90,smooth]
-            (\x,{2.35+0.94*exp(-1.45*(\x-3.18)^2)}) -- (6.25,2.35) -- cycle;
-          \draw[BrandBlue,line width=1.8pt,domain=0.35:6.25,samples=90,smooth]
-            plot (\x,{2.35+0.94*exp(-1.45*(\x-3.18)^2)});
-          \node[text=BrandBlue] at (5.45,3.55) {one-mode $q_\theta$};
-          \node[text=TrailDark] at (5.35,2.62) {$p_{\Tau}$};
-        }
-
-        \uncover<2->{%
-          \node[anchor=west,font=\bfseries,text=Ink] at (0.25,1.82)
-            {Diffusion variational family};
-          \draw[->,Slate] (0.25,-0.30) -- (6.55,-0.30) node[right,text=Ink] {$x$};
-          \draw[TrailDark,line width=1.5pt,dashed,domain=0.35:6.25,
-                samples=100,smooth]
-            plot (\x,{-0.22
-              +0.82*exp(-4.5*(\x-1.20)^2)
-              +1.12*exp(-5.0*(\x-3.20)^2)
-              +0.92*exp(-4.8*(\x-5.25)^2)});
-          \path[fill=BrandBlue,fill opacity=0.16]
-            (0.35,-0.30) -- plot[domain=0.35:6.25,samples=100,smooth]
-            (\x,{-0.30
-              +0.76*exp(-4.2*(\x-1.20)^2)
-              +1.04*exp(-4.8*(\x-3.20)^2)
-              +0.86*exp(-4.5*(\x-5.25)^2)}) -- (6.25,-0.30) -- cycle;
-          \draw[BrandBlue,line width=1.8pt,domain=0.35:6.25,
-                samples=100,smooth]
-            plot (\x,{-0.30
-              +0.76*exp(-4.2*(\x-1.20)^2)
-              +1.04*exp(-4.8*(\x-3.20)^2)
-              +0.86*exp(-4.5*(\x-5.25)^2)});
-          \node[text=BrandBlue] at (5.15,1.32) {multimodal $q_\theta$};
-          \node[text=TrailDark] at (5.35,-0.02) {$p_{\Tau}$};
-        }
-      \end{tikzpicture}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Forward diffusion destroys structure; reverse diffusion rebuilds it}
-  \small
-  \begin{columns}[onlytextwidth]
-    \column{0.27\textwidth}
-      \centering
-      \textbf{Prior}\\[-0.03cm]
-      $x^K\sim q_K=\Normal(0,\nu^2I)$
-    \column{0.42\textwidth}
-      \centering
-      \textcolor{Slate}{the same probability mass at noise level $k$}
-    \column{0.27\textwidth}
-      \centering
-      \textbf{Multimodal target}\\[-0.03cm]
-      $x^0\sim p_{\Tau}$
-  \end{columns}
-  \vspace{0.05cm}
-
-  \animategraphics[autoplay,loop,poster=first,width=0.96\linewidth]
-    {4}{assets/diffusion_transport/frame-}{0}{47}
-  \vspace{0.05cm}
-
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      \centering\scriptsize
-      \textcolor{TrailDark}{\textbf{Fixed forward / noising kernel}}\\[-0.03cm]
-      $p(x^k\mid x^{k-1}):\quad x^0\longrightarrow x^K$
-    \column{0.49\textwidth}
-      \centering\scriptsize
-      \textcolor{BrandBlue}{\textbf{Learned reverse / denoising kernel}}\\[-0.03cm]
-      $q_\theta(x^{k-1}\mid x^k):\quad x^K\longrightarrow x^0$
-  \end{columns}
-\end{frame}
-
-\begin{frame}{Variance-preserving SDE and its discretization}
-  \scriptsize
-  \begin{block}<1->{Continuous-time VP-SDE}
-    For a noise scale $\nu>0$ and rate $\beta(t)>0$,
-    \[
-      dX_t=-\beta(t)X_t\,dt
-        +\nu\sqrt{2\beta(t)}\,dW_t,
-      \qquad B(t):=\int_0^t\beta(s)\,ds.
-    \]
-  \end{block}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      \begin{block}<2->{Exact update over one interval}
-        Define
-        \[
-          \alpha_k:=\exp\!\left(
-          -2\int_{t_{k-1}}^{t_k}\beta(s)\,ds\right).
-        \]
-        Then
-        \[
-          X^k=\sqrt{\alpha_k}\,X^{k-1}
-            +\nu\sqrt{1-\alpha_k}\,\varepsilon_k,
-          \quad \varepsilon_k\sim\Normal(0,I).
-        \]
-      \end{block}
-
-    \column{0.49\textwidth}
-      \begin{block}<3->{Forward transition kernel}
-        \[
-          p(x^k\mid x^{k-1})
-          =\Normal\!\left(\sqrt{\alpha_k}x^{k-1},
-                           \nu^2(1-\alpha_k)I\right).
-        \]
-      \end{block}
-      \begin{block}<4->{Learned reverse transition}
-        \[
-          q_\theta(x^{k-1}\mid x^k)
-          =\Normal\!\left(\mu_\theta(x^k,t_k),\sigma_k^2I\right),
-          \quad \sigma_k>0.
-        \]
-      \end{block}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{When has the VP-SDE added enough noise?}
-  \scriptsize
-  \setlength{\abovedisplayskip}{3pt}
-  \setlength{\belowdisplayskip}{3pt}
-  \begin{columns}[T,onlytextwidth]
-    \column{0.56\textwidth}
-      \begin{block}<1->{Assume a Gaussian target}
-        If $X_0\sim\Normal(m,\Sigma)$, the VP-SDE remains Gaussian:
-        \[
-          X_t\sim\Normal(m_t,\Sigma_t),
-        \]
-        \[
-          m_t=e^{-B(t)}m,\qquad
-          \Sigma_t=e^{-2B(t)}(\Sigma-\nu^2I)+\nu^2I.
-        \]
-      \end{block}
-      \begin{block}<3->{A practical ``enough noise'' condition}
-        At the terminal time, require both residuals to be negligible:
-        \[
-          e^{-B(T)}\lVert m\rVert\leq\epsilon_m,
-          \qquad
-          e^{-2B(T)}\lVert\Sigma-\nu^2I\rVert\leq\epsilon_\Sigma.
-        \]
-      \end{block}
-      \begin{alertblock}<4->{Conclusion}
-        If $B(T)=\int_0^T\beta(s)\,ds$ is sufficiently large, then
-        $X_T\approx\Normal(0,\nu^2I)$: the terminal prior has forgotten the target.
-      \end{alertblock}
-
-    \column{0.40\textwidth}
-      \centering
-      \begin{tikzpicture}[x=0.72cm,y=0.78cm,font=\scriptsize]
-        \draw[-{Stealth[length=5pt]},Slate] (0.15,0.15) -- (5.45,0.15)
-          node[right,text=Ink] {$x$};
-        \draw[Slate,dashed] (2.70,0.10) -- (2.70,4.75);
-        \node[below,text=Slate] at (2.70,0.08) {$0$};
-
-        \uncover<1->{%
-          \path[fill=Trail,fill opacity=0.14]
-            (0.15,0.15) -- plot[domain=0.15:5.30,samples=100,smooth]
-            (\x,{0.15+1.72*exp(-2.9*(\x-4.20)^2)}) -- (5.30,0.15) -- cycle;
-          \draw[TrailDark,line width=1.6pt,domain=0.15:5.30,samples=100,smooth]
-            plot (\x,{0.15+1.72*exp(-2.9*(\x-4.20)^2)});
-          \node[text=TrailDark,font=\bfseries] at (4.33,2.12)
-            {$X_0\sim\Normal(m,\Sigma)$};
-        }
-        \uncover<2->{%
-          \path[fill=BrandBlue,fill opacity=0.10]
-            (0.15,0.15) -- plot[domain=0.15:5.30,samples=100,smooth]
-            (\x,{0.15+1.42*exp(-1.45*(\x-3.35)^2)}) -- (5.30,0.15) -- cycle;
-          \draw[BrandBlue!62,line width=1.6pt,domain=0.15:5.30,samples=100,smooth]
-            plot (\x,{0.15+1.42*exp(-1.45*(\x-3.35)^2)});
-          \node[text=BrandBlue!75!black] at (3.82,2.86) {$X_t$};
-        }
-        \uncover<4->{%
-          \path[fill=BrandBlue,fill opacity=0.18]
-            (0.15,0.15) -- plot[domain=0.15:5.30,samples=100,smooth]
-            (\x,{0.15+1.18*exp(-0.92*(\x-2.70)^2)}) -- (5.30,0.15) -- cycle;
-          \draw[BrandBlue,line width=2.0pt,domain=0.15:5.30,samples=100,smooth]
-            plot (\x,{0.15+1.18*exp(-0.92*(\x-2.70)^2)});
-          \node[text=BrandBlue,font=\bfseries,align=center] at (2.70,4.20)
-            {$X_T\approx\Normal(0,\nu^2I)$\\target information erased};
-        }
-        \uncover<2->{%
-          \draw[-{Stealth[length=6pt]},BrandBlue,line width=1.2pt]
-            (4.45,3.42) to[bend left=16]
-            node[above,text=BrandBlue] {$B(t)\uparrow$} (3.12,3.55);
-        }
-      \end{tikzpicture}
-      \vspace{0.10cm}
-
-      \uncover<1->{\tiny
-        \href{https://arxiv.org/abs/2307.01198}
-          {\textcolor{BrandBlue}{L. Richter et al.,
-          \emph{Improved Sampling via Learned Diffusions}}},
-        ICLR 2024, App.~A.5.}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{KL chain rule: paths dominate marginals}
-  \small
-  \begin{block}<1->{Chain rule}
-    \[
-      \KL\!\left(q(x^{0:K})\|p(x^{0:K})\right)
-      =\KL\!\left(q(x^0)\|p(x^0)\right)
-      +\E_{q(x^0)}\!\left[
-        \KL\!\left(q(x^{1:K}\mid x^0)\|p(x^{1:K}\mid x^0)\right)
-      \right].
-    \]
-  \end{block}
-  \begin{alertblock}<2->{The conditional KL is nonnegative}
-    \[
-      \boxed{%
-      \KL\!\left(q(x^0)\|p(x^0)\right)
-      \leq
-      \KL\!\left(q(x^{0:K})\|p(x^{0:K})\right)}
-    \]
-    \centering
-    Endpoint density: intractable \qquad Path transitions: tractable
-  \end{alertblock}
-\end{frame}
-
-\begin{frame}{The diffusion path-space upper bound}
-  \begin{itemize}[<+->]
-    \item \textbf{Reverse and forward paths:}
-      \[
-        q_\theta(x^{0:K})=q_K(x^K)\prod_{k=1}^{K}q_\theta(x^{k-1}\mid x^k),
-        \quad
-        p_{\Tau}(x^{0:K})=p_{\Tau}(x^0)\prod_{k=1}^{K}p(x^k\mid x^{k-1})
-      \]
-    \item \textbf{DPI upper bound:}
-      \[
-        \boxed{\KL(q_\theta(x^0)\|p_{\Tau}(x^0))
-        \leq \KL(q_\theta(x^{0:K})\|p_{\Tau}(x^{0:K}))}
-      \]
-    \item \textbf{Trainable loss, up to $\Tau\log Z_{\Tau}$:}
-      \[
-        L_{\mathrm{path}}
-        =\E_{q_\theta}\!\left[
-        -R(x^0)+\Tau\log q_K(x^K)
-        +\Tau\sum_{k=1}^{K}\log
-        \frac{q_\theta(x^{k-1}\mid x^k)}
-             {p(x^k\mid x^{k-1})}\right]
-      \]
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Optional Langevin preconditioning and clipping}
-  \begin{itemize}[<+->]
-    \item \textbf{Target score:}
-      \[
-        g_{\Tau}(x)=\operatorname{clip}
-        \left(\frac{\nabla_xR(x)}{\Tau},-10^2,10^2\right)
-      \]
-    \item \textbf{Preconditioned drift (Vargas et al., 2023):}
-      \[
-        f_\theta(k,x)=\operatorname{clip}\!\left(
-        \mathrm{NN}_1(k,x)+\mathrm{NN}_2(k)\odot g_{\Tau}(x),
-        -10^4,10^4\right)
-      \]
-    \item \textbf{Reverse score:} $s_\theta(k,x)=-x/\nu^2+f_\theta(k,x)$
-    \item Detached analytic gradient
-    \item Score and drift clipping
-    \item Comparison axis: \texttt{use\_langevin\_preconditioning}
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{Lesson 3 exercise: starter code}
-  \centering
-  \uncover<1->{%
-    \href{run:../L4-DiffusionSamplers/diffusion_sampler_student.ipynb}
-      {\textcolor{BrandBlue}{\texttt{L4-DiffusionSamplers/diffusion\_sampler\_student.ipynb}}}
-  }
-  \vspace{0.10cm}
-
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      \begin{block}<2->{A. Forward kernel TODOs}
-\fontsize{5.8}{6.5}\selectfont
-\begin{verbatim}
-def forward_sde_step(previous_state, beta,
-                     reparameterize, noise=None):
-    # TODO: mean, std, and sample
-    raise NotImplementedError(...)
-
-def forward_kernel_log_prob(previous_state,
-                            noisy_state, beta):
-    # TODO: reconstruct p(x^k | x^{k-1})
-    raise NotImplementedError(...)
-\end{verbatim}
-      \end{block}
-    \column{0.49\textwidth}
-      \begin{block}<3->{B. Reverse kernel TODOs}
-\fontsize{5.8}{6.5}\selectfont
-\begin{verbatim}
-def reverse_sde_step(score_network, noisy_state,
-                     step_index, beta, num_steps,
-                     reparameterize, noise=None):
-    # TODO: score, mean, std, and sample
-    raise NotImplementedError(...)
-
-def reverse_kernel_log_prob(score_network,
-    previous_state, noisy_state, step_index,
-    beta, num_steps):
-    # TODO: reconstruct q_theta(x^{k-1} | x^k)
-    raise NotImplementedError(...)
-\end{verbatim}
-      \end{block}
-  \end{columns}
-\end{frame}
-
-\begin{frame}[fragile]{Lesson 3 exercise: solution}
-  \centering
-  \uncover<1->{%
-    \href{run:../L4-DiffusionSamplers/diffusion_sampler_solution.ipynb}
-      {\textcolor{BrandBlue}{\texttt{L4-DiffusionSamplers/diffusion\_sampler\_solution.ipynb}}}
-  }
-  \vspace{0.06cm}
-
-  \begin{columns}[T,onlytextwidth]
-    \column{0.49\textwidth}
-      \begin{block}<2->{A. Forward kernel solution}
-\fontsize{6.2}{7.0}\selectfont
-\begin{verbatim}
-alpha = 1.0 - beta
-mean = alpha.sqrt() * previous_state
-std = PRIOR_STD * beta.sqrt()
-if noise is not None:
-    return mean + std * noise
-q = Independent(Normal(mean, std), 1)
-if reparameterize:
-    return q.rsample()
-return q.sample()
-
-# forward_kernel_log_prob
-mean = (1.0 - beta).sqrt() * previous_state
-p = Independent(Normal(mean,
-    PRIOR_STD * beta.sqrt()), 1)
-return p.log_prob(noisy_state)
-\end{verbatim}
-      \end{block}
-    \column{0.49\textwidth}
-      \begin{block}<3->{B. Reverse kernel solution}
-\fontsize{6.2}{7.0}\selectfont
-\begin{verbatim}
-alpha = 1.0 - beta
-score = score_network(noisy_state,
-                      step_index, num_steps)
-mean = noisy_state + beta * PRIOR_STD**2 * score
-mean = mean / alpha.sqrt()
-std = PRIOR_STD * beta.sqrt()
-if noise is not None:
-    return mean + std * noise
-q = Independent(Normal(mean, std), 1)
-if reparameterize:
-    return q.rsample()
-return q.sample()
-
-# reverse_kernel_log_prob: same mean and std
-return q.log_prob(previous_state)
-\end{verbatim}
-      \end{block}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{GMM-40 training: estimator $\times$ Langevin preconditioning}
-  \centering
-  \animategraphics[autoplay,loop,poster=last,height=0.68\textheight]
-    {1.5}{assets/l4_training/frame-}{0}{20}
-  \vspace{0.04cm}
-
-  {\scriptsize Same seed, noise, schedule, and budget in all four runs.
-  The right column shows fixed-noise path loss; dashed lines mark the current step.}
 \end{frame}
 
 \section{Lesson 4: Diffusion-augmented MDPs}
@@ -2114,17 +2085,51 @@ return q.log_prob(previous_state)
 
 \begin{frame}{References and course material}
   \scriptsize
-  \begin{itemize}[<+->]
+  \begin{itemize}
     \item Sanokowski \& Patil (2026): \emph{Diffusion-Augmented MDPs}
     \item Kingma \& Welling (2014): \emph{Auto-Encoding Variational Bayes}
     \item Williams (1992): \emph{REINFORCE}
     \item Song et al. (2021): \emph{Score-Based Generative Modeling}
     \item Vargas, Grathwohl \& Doucet (2023): \emph{Denoising Diffusion Samplers}
     \item Levine (2018): \emph{RL and Control as Probabilistic Inference}
+    \item \href{https://arxiv.org/abs/1801.01290}
+      {\textcolor{BrandBlue}{Haarnoja et al. (2018): \emph{Soft Actor-Critic}}}
+    \item \href{https://arxiv.org/abs/1502.05477}
+      {\textcolor{BrandBlue}{Schulman et al. (2015): \emph{Trust Region Policy Optimization}}}
+    \item \href{https://arxiv.org/pdf/2502.02316}
+      {\textcolor{BrandBlue}{Celik et al. (2025):
+      \emph{DIME: Diffusion-Based Maximum Entropy Reinforcement Learning}}}
+    \item \href{https://arxiv.org/abs/2606.15260}
+      {\textcolor{BrandBlue}{Le et al. (2026):
+      \emph{Trust-Region Diffusion Policies for Massively Parallel On-Policy RL} (TruDi)}}
     \item Course folders:
-      \texttt{L1-CostMin/} $\rightarrow$ \texttt{L2-MaxEntMin/}
-      $\rightarrow$ \texttt{L4-DiffusionSamplers/}
+      \texttt{L1-VariationalInference/}
+      $\rightarrow$ \texttt{L2-DiffusionSamplers/}
   \end{itemize}
+\end{frame}
+
+\begin{frame}[plain]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[BrandBlue] (current page.south west) rectangle (current page.north east);
+    \path[fill=white,fill opacity=0.08]
+      (current page.south west) -- (current page.north west)
+      -- ([xshift=5.4cm]current page.north west)
+      -- ([xshift=8.3cm]current page.south west) -- cycle;
+    \node[anchor=west,align=left,text=white,text width=8.6cm]
+      at ([xshift=1.05cm,yshift=0.10cm]current page.west)
+      {{\bfseries\fontsize{34}{38}\selectfont Thank you!}\\[0.30cm]
+       {\fontsize{17}{21}\selectfont Sebastian Sanokowski}\\[0.65cm]
+       {\fontsize{15}{20}\selectfont Interested in working on DA-MDPs?\\[0.12cm]
+        Feel free to contact me.}};
+    \node[fill=white,rounded corners=6pt,inner sep=0.40cm,
+          align=center,text=Ink]
+      at ([xshift=-2.9cm,yshift=0.10cm]current page.east)
+      {\href{https://www.linkedin.com/in/sebastian-sanokowski-0664451b7/}{%
+         \qrcode[height=3.2cm]{https://www.linkedin.com/in/sebastian-sanokowski-0664451b7/}}\\[0.18cm]
+       {\bfseries\large LinkedIn}\\[0.06cm]
+       {\small Scan to connect}};
+  \end{tikzpicture}
+  \plainlogos
 \end{frame}
 
 \end{document}
