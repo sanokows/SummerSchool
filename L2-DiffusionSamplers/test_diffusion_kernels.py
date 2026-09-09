@@ -151,13 +151,13 @@ class DiscreteVPKernelTests(unittest.TestCase):
             calls["sample"].append((k, float(delta)))
             return self.kernels.reverse_sde_step(network, state, k, delta, total, **kwargs)
 
-        def reverse_log(network, previous, state, k, delta, total):
+        def reverse_log(network, previous, state, k, delta, total, **kwargs):
             calls["reverse_log"].append((k, float(delta)))
-            return self.kernels.reverse_kernel_log_prob(network, previous, state, k, delta, total)
+            return self.kernels.reverse_kernel_log_prob(network, previous, state, k, delta, total, **kwargs)
 
-        def forward_log(previous, state, delta):
+        def forward_log(previous, state, delta, **kwargs):
             calls["forward_log"].append(float(delta))
-            return self.kernels.forward_kernel_log_prob(previous, state, delta)
+            return self.kernels.forward_kernel_log_prob(previous, state, delta, **kwargs)
 
         kernels = common.DiffusionKernels(self.kernels.forward_sde_step, reverse_step,
                                          forward_log, reverse_log)
@@ -214,6 +214,7 @@ class DiscreteVPKernelTests(unittest.TestCase):
                         self.assertTrue(all(torch.isfinite(v).all() for v in history["samples"]))
                         self.assertFalse(torch.equal(history["samples"][0], history["samples"][-1]))
                         self.assertTrue(torch.all(trained.schedule().diff() > 0))
+                        self.assertEqual(history["temperature"], [common.TEMPERATURE] * 3)
 
     def test_configurable_target_prior_schedule_and_training(self):
         """Nondefault settings must reach the target, kernels, and optimizer run."""
@@ -229,14 +230,15 @@ class DiscreteVPKernelTests(unittest.TestCase):
             torch.testing.assert_close(common.MODE_LOCATIONS, expected_locations)
 
             prior_std = 7.0
-            kernels = load_notebook_kernels(prior_std=prior_std)
+            # Defaults stay at 30: the sampler must explicitly pass its own scale.
+            kernels = load_notebook_kernels()
             for estimator in ("reparameterization", "log_derivative"):
                 sampler, history = common.train_sampler(
                     kernels, gradient_estimator=estimator, learn_schedule=True,
                     use_langevin_preconditioning=True, num_steps=5, prior_std=prior_std,
                     beta_start=0.01, beta_end=0.04, diffusion_step_size=0.4,
                     score_width=24, langevin_gradient_clip=11, langevin_drift_clip=23,
-                    temperature=0.6, initial_temperature=1.4, temperature_anneal_steps=4,
+                    temperature=0.6,
                     steps=4, batch_size=16, learning_rate=1e-3, schedule_learning_rate=2e-3,
                     max_grad_norm=2, log_every=2, num_animation_samples=12, animation_seed=17,
                 )
@@ -249,7 +251,7 @@ class DiscreteVPKernelTests(unittest.TestCase):
                 self.assertEqual(sampler.schedule.step_size, 0.4)
                 self.assertEqual(history["samples"][-1].shape, (12, 2))
                 torch.testing.assert_close(sampler.schedule()[[0, -1]], torch.tensor([0.01, 0.04]))
-                torch.testing.assert_close(torch.tensor(history["temperature"]), torch.tensor([1.4, 1.0, 0.6]))
+                self.assertEqual(history["temperature"], [0.6, 0.6, 0.6])
                 self.assertFalse(torch.equal(history["betas"][0], history["betas"][-1]))
                 self.assertTrue(all(math.isfinite(x) for x in history["evaluation_loss"]))
 

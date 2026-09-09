@@ -1,0 +1,12 @@
+{
+  "source": "DMERL/src/env_utils/turning_double_well_env.py:reward_from_angle",
+  "config": "DMERL/config/env/mjx_double_well.yaml",
+  "max_turn_degrees": 90.0,
+  "well_angle_degrees": 45.0,
+  "well_height": 0.85,
+  "reward_maximizing_actions": [
+    -0.5,
+    0.5
+  ],
+  "reward_depends_on_heading": false
+}

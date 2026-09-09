@@ -1,0 +1,62 @@
+{
+  "format_version": 1,
+  "diffusion": {
+    "prior_std": 1.0,
+    "num_steps": 600,
+    "schedule": "linear",
+    "delta_start": 0.005,
+    "delta_end": 0.035,
+    "mode_location": 3.0,
+    "component_std": 0.55
+  },
+  "model_width": 64,
+  "training": {
+    "steps": 8000,
+    "batch_size": 1024,
+    "learning_rate": 0.001,
+    "seed": 42,
+    "objective": "variance-weighted squared error to the exact forward-mixture score",
+    "state_sampling": "80% forward marginals, 20% uniform [-7,7]; extra early-time samples",
+    "history": [
+      {
+        "step": 1000,
+        "weighted_mse": 0.02953660860657692
+      },
+      {
+        "step": 2000,
+        "weighted_mse": 0.011446118354797363
+      },
+      {
+        "step": 3000,
+        "weighted_mse": 0.004255443811416626
+      },
+      {
+        "step": 4000,
+        "weighted_mse": 0.0004600023094099015
+      },
+      {
+        "step": 5000,
+        "weighted_mse": 0.0027188663370907307
+      },
+      {
+        "step": 6000,
+        "weighted_mse": 0.002299283631145954
+      },
+      {
+        "step": 7000,
+        "weighted_mse": 0.0003239899524487555
+      },
+      {
+        "step": 8000,
+        "weighted_mse": 0.00028426223434507847
+      }
+    ]
+  },
+  "validation": {
+    "samples": 8192,
+    "seed": 43,
+    "weighted_score_rmse": 0.0057566482573747635,
+    "relative_score_rmse": 0.006531587801873684
+  },
+  "note": "A trained neural score, not an analytic-score replacement. Reverse Euler sampling is approximate."
+}

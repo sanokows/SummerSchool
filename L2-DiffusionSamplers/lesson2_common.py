@@ -111,7 +111,7 @@ configure_target()
 
 
 def plot_reward_landscape(axis: plt.Axes) -> None:
-    """Draw the paper-style GMM-40 contours and component centers."""
+    """Draw the GMM-40 contours without markers at the component centers."""
     axis.contour(
         GRID_X,
         GRID_Y,
@@ -120,15 +120,6 @@ def plot_reward_landscape(axis: plt.Axes) -> None:
         cmap="viridis",
         linewidths=0.55,
         alpha=0.9,
-    )
-    axis.scatter(
-        MODE_LOCATIONS[:, 0],
-        MODE_LOCATIONS[:, 1],
-        s=9,
-        color="#0067B1",
-        alpha=0.82,
-        zorder=3,
-        label="GMM component means",
     )
     axis.set(
         xlim=(-PLOT_BOUND, PLOT_BOUND),
@@ -398,6 +389,7 @@ class DiffusionSampler(nn.Module):
                 self.num_steps,
                 reparameterize=reparameterize,
                 noise=noise,
+                prior_std=self.prior_std,
             )
             log_q = log_q + self.kernels.reverse_kernel_log_prob(
                 self.score_network,
@@ -406,9 +398,10 @@ class DiffusionSampler(nn.Module):
                 step_index,
                 reverse_delta,
                 self.num_steps,
+                prior_std=self.prior_std,
             )
             log_forward = log_forward + self.kernels.forward_kernel_log_prob(
-                previous_state, state, forward_delta
+                previous_state, state, forward_delta, prior_std=self.prior_std
             )
             states[step_index - 1] = previous_state
             state = previous_state
@@ -462,7 +455,7 @@ def check_kernel_functions(
     clean_state = torch.randn(16, STATE_DIMENSION)
 
     noisy_state = kernels.forward_sde_step(
-        clean_state, delta, reparameterize=True
+        clean_state, delta, reparameterize=True, prior_std=prior_std
     )
     recovered_state = kernels.reverse_sde_step(
         score_network,
@@ -471,9 +464,10 @@ def check_kernel_functions(
         delta,
         num_steps,
         reparameterize=True,
+        prior_std=prior_std,
     )
     forward_log_prob = kernels.forward_kernel_log_prob(
-        clean_state, noisy_state, delta
+        clean_state, noisy_state, delta, prior_std=prior_std
     )
     reverse_log_prob = kernels.reverse_kernel_log_prob(
         score_network,
@@ -482,6 +476,7 @@ def check_kernel_functions(
         min(4, num_steps),
         delta,
         num_steps,
+        prior_std=prior_std,
     )
 
     assert noisy_state.shape == clean_state.shape
@@ -549,8 +544,6 @@ def train_sampler(
     learning_rate: float = 5.0e-4,
     schedule_learning_rate: float = 3.0e-4,
     log_every: int = 25,
-    initial_temperature: float = 2.0,
-    temperature_anneal_steps: int = 700,
     num_animation_samples: int = 600,
     temperature: float = TEMPERATURE,
     max_grad_norm: float = 10.0,
@@ -564,11 +557,11 @@ def train_sampler(
     langevin_gradient_clip: float = LANGEVIN_GRADIENT_CLIP,
     langevin_drift_clip: float = LANGEVIN_DRIFT_CLIP,
 ) -> tuple[DiffusionSampler, dict[str, list]]:
-    """Train a sampler and retain fixed-noise samples for a smooth GIF."""
+    """Train at a fixed target temperature and retain fixed-noise GIF samples."""
     if gradient_estimator not in {"reparameterization", "log_derivative"}:
         raise ValueError("Unknown gradient estimator.")
-    if not all(math.isfinite(t) and t > 0 for t in (temperature, initial_temperature)):
-        raise ValueError("Diffusion sampling requires positive, finite temperatures.")
+    if not math.isfinite(temperature) or temperature <= 0:
+        raise ValueError("Diffusion sampling requires a positive, finite temperature.")
 
     torch.manual_seed(seed)
     sampler = DiffusionSampler(
@@ -581,6 +574,7 @@ def train_sampler(
         langevin_gradient_clip=langevin_gradient_clip,
         langevin_drift_clip=langevin_drift_clip,
     )
+    sampler.temperature = temperature
     parameter_groups = [
         {"params": sampler.score_network.parameters(), "lr": learning_rate}
     ]
@@ -623,10 +617,6 @@ def train_sampler(
     latest_loss = float("nan")
 
     for step in range(steps + 1):
-        annealing_progress = min(step / max(temperature_anneal_steps, 1), 1.0)
-        sampler.temperature = initial_temperature + annealing_progress * (
-            temperature - initial_temperature
-        )
         if step % log_every == 0 or step == steps:
             with torch.no_grad():
                 fixed_path = sampler.sample_reverse_path(
@@ -706,6 +696,17 @@ def plot_training_summary(
     return fig
 
 
+def set_loss_axis_scale(axis, loss_histories) -> None:
+    """Use log loss axes, retaining zero/negative objectives with a symlog scale."""
+    if all(value > 0 for values in loss_histories for value in values):
+        axis.set_yscale("log")
+        axis.set_ylabel(axis.get_ylabel() + " (log scale)")
+    else:
+        # A path objective can be negative; preserve it without shifting/clipping.
+        axis.set_yscale("symlog", linthresh=1.0)
+        axis.set_ylabel(axis.get_ylabel() + " (symlog scale)")
+
+
 def save_training_animation(
     history: dict[str, list],
     output_path: Path,
@@ -748,7 +749,8 @@ def save_training_animation(
         ylabel="path-space objective",
         xlim=(history["step"][0], history["step"][-1]),
     )
-    loss_axis.grid(alpha=0.2)
+    set_loss_axis_scale(loss_axis, [loss_values])
+    loss_axis.grid(alpha=0.2, which="both")
 
     def update(frame: int):
         sample_artist.set_offsets(history["samples"][frame])
@@ -787,10 +789,22 @@ def save_training_comparison_animation(
     experiments: list[tuple[str, bool, dict[str, list]]],
     output_path: Path,
     *, fps: float = 1.5, dpi: int = 92,
+    frame_indices: list[int] | None = None,
 ) -> animation.FuncAnimation:
-    """Save the 2x2 estimator-by-preconditioning training comparison."""
+    """Compare estimators in columns and Langevin off/on in rows.
+
+    Optional frame indices shorten long animations while retaining full loss curves.
+    """
     if len(experiments) != 4:
         raise ValueError("The comparison requires exactly four experiments.")
+    by_setting = {(estimator, langevin): history
+                  for estimator, langevin, history in experiments}
+    order = [(estimator, langevin) for langevin in (False, True)
+             for estimator in ("reparameterization", "log_derivative")]
+    if set(by_setting) != set(order):
+        raise ValueError("Provide each estimator with Langevin off and on exactly once.")
+    experiments = [(estimator, langevin, by_setting[(estimator, langevin)])
+                   for estimator, langevin in order]
 
     frame_counts = {len(history["step"]) for _, _, history in experiments}
     step_grids = {tuple(history["step"]) for _, _, history in experiments}
@@ -820,7 +834,7 @@ def save_training_comparison_animation(
                 samples[:, 0],
                 samples[:, 1],
                 s=10,
-                color="#0067B1",
+                color="#0067B1" if gradient_estimator == "reparameterization" else "#D76A12",
                 alpha=0.58,
                 zorder=4,
             )
@@ -837,10 +851,11 @@ def save_training_comparison_animation(
     current_step_lines = []
     for row, loss_axis in enumerate(loss_axes):
         row_experiments = experiments[2 * row : 2 * row + 2]
-        for (_, use_langevin, history), color in zip(
-            row_experiments, ("#64748B", "#0067B1")
+        for (gradient_estimator, _, history), color in zip(
+            row_experiments, ("#0067B1", "#D76A12")
         ):
-            label = "+ Langevin" if use_langevin else "without Langevin"
+            label = ("Reparameterization" if gradient_estimator == "reparameterization"
+                     else "Log derivative")
             values = history["evaluation_loss"]
             loss_axis.plot(
                 history["step"], values, color=color, linewidth=1.9, label=label
@@ -862,9 +877,9 @@ def save_training_comparison_animation(
                 linewidth=1.3,
             )
         )
-        estimator_label = "Reparameterization" if row == 0 else "Log derivative"
+        preconditioner_label = "without Langevin" if row == 0 else "+ Langevin"
         loss_axis.set(
-            title=f"Path loss · {estimator_label}",
+            title=f"Path loss · {preconditioner_label}",
             xlabel="optimization step",
             ylabel="fixed-noise path objective",
             xlim=(
@@ -872,7 +887,16 @@ def save_training_comparison_animation(
                 row_experiments[0][2]["step"][-1],
             ),
         )
-        loss_axis.grid(alpha=0.2)
+        set_loss_axis_scale(
+            loss_axis, [history["evaluation_loss"] for _, _, history in row_experiments]
+        )
+        if row_experiments[0][2]["step"][-1] >= 10_000:
+            from matplotlib.ticker import FuncFormatter, MultipleLocator
+            loss_axis.xaxis.set_major_locator(MultipleLocator(5000))
+            loss_axis.xaxis.set_major_formatter(
+                FuncFormatter(lambda value, _: f"{value / 1000:g}k" if value else "0")
+            )
+        loss_axis.grid(alpha=0.2, which="both")
         loss_axis.legend(fontsize=8)
 
     fig.subplots_adjust(left=0.055, right=0.985, bottom=0.075, top=0.90)
@@ -905,7 +929,7 @@ def save_training_comparison_animation(
     comparison_animation = animation.FuncAnimation(
         fig,
         update,
-        frames=frame_counts.pop(),
+        frames=frame_counts.pop() if frame_indices is None else frame_indices,
         interval=1000 / fps,
         blit=False,
     )

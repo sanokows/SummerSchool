@@ -1,6 +1,5 @@
 .venv/
 .ipynb_checkpoints/
 __pycache__/
-*_solution.ipynb
 *.log
 *.synctex.gz
