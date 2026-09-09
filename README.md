@@ -44,10 +44,8 @@ to install the widget dependency.
 
 The 22 KB pretrained model and its configuration are in
 `L2-DiffusionSamplers/assets/bimodal_score.{pt,json}`. No download or training is
-needed to use it. Instructors can regenerate it with
-`.venv/bin/python L2-DiffusionSamplers/train_demo_score.py`; its JSON records the
-training settings and validation error. It learns the known forward-mixture
-scores; the reverse demo evaluates the trained network.
+needed to use it. The reverse demo evaluates this trained network; its JSON
+records the fixed diffusion settings and validation error.
 
 The later Lesson 2 sampler supports learning the interior diffusion coefficients with
 `LEARN_DIFFUSION_SCHEDULE=True`, while keeping their endpoints fixed.

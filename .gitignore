@@ -3,3 +3,15 @@
 __pycache__/
 *.log
 *.synctex.gz
+
+# Local slide authoring files; publish the finished presentation PDFs only.
+/Slides/*
+!/Slides/*.pdf
+/.vscode/
+
+# Instructor checks, model training, and generated experiment outputs.
+/L2-DiffusionSamplers/test_*.py
+/L2-DiffusionSamplers/train_demo_score.py
+/L1-VariationalInference/maximum_entropy_reward_training.gif
+/L2-DiffusionSamplers/diffusion_sampler_training.gif
+/artifacts/
