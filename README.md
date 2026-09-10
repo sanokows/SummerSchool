@@ -70,10 +70,10 @@ preview only displays saved notebook content.
 
 Follow along with the [presentation](Slides/main.pdf). Its references are grouped
 into VI and diffusion foundations, diffusion samplers, RL, and diffusion policies
-and RL. The introduction presents
+and RL. The talk closes with a brief pitch for
 [Guided Discovery of New Behaviors using Diffusion Policies](https://arxiv.org/abs/2606.08743)
-(accepted to CoRL) through rare-case sampling, shooting-based trajectory repair,
-and policy fine-tuning, before introducing diffusion RL. The StackCube and
+(accepted to CoRL) as another route to diverse behaviors: rare-case sampling,
+shooting-based trajectory repair, and policy fine-tuning. The StackCube and
 PushT slides link to the public [DA-MDP PyTorch repository](https://github.com/Atarilab/DA_MDP_pytorch)
 with code QR codes; that repository includes installation instructions,
 multimodal GIFs, working configs, and downloadable checkpoints.
@@ -88,6 +88,30 @@ and a notation table provides a reference before the closing slide.
 | 2 | Diffusion samplers | [Diffusion sampler](L2-DiffusionSamplers/diffusion_sampler_student.ipynb) | [Lesson 2 solution](L2-DiffusionSamplers/diffusion_sampler_solution.ipynb) |
 | 3 | Reinforcement learning as variational inference | Slides | — |
 | 4 | Diffusion-augmented MDPs | Slides | — |
+
+### Training runs and expected time
+
+The assignment slides show what to implement, initial samples before training,
+and a short time estimate. After implementing the tasks,
+execute the default comparison cell to run every configuration:
+
+| Exercise | Runs | Default size per run | Laptop execution budget |
+| --- | --- | --- | --- |
+| Lesson 1: Gaussian VI on GMM-40 | Reparameterization and log derivative (2 runs) | 800 updates, 512 samples/update | 1–2 min total, including GIF export |
+| Lesson 2: 1D kernel demos | Forward simulation and reverse simulation with a pretrained score; no training | 600 diffusion steps, 4096 particles | A few seconds per simulation |
+| Lesson 2: diffusion samplers on GMM-40 | Both estimators, each with Langevin off and on (4 runs) | 800 updates, 256 paths/update, 24 diffusion steps/path | 3–5 min total, including GIF export |
+
+These are execution budgets, excluding coding and environment installation.
+On an Intel i9-14900HX CPU, the default Lesson 1 training took 3 seconds total
+and GIF export took 8 seconds. Lesson 2 took 84 seconds for all four runs and
+final evaluation, plus 13 seconds for GIF export, using its default 2 CPU
+threads. Slower laptops may take longer; no GPU is required.
+
+The 26,000-update diffusion animations in the slides are prepared long runs.
+Students run the shorter 800-update comparison to observe learning; full
+convergence is not expected from every configuration. Temperature experiments
+and learning the diffusion schedule are optional extensions. Lessons 3 and 4
+use slides and prepared RL results, with no additional student training runs.
 
 ### Hyperparameters
 
@@ -132,7 +156,8 @@ records the fixed diffusion settings and validation error.
 The later GMM-40 experiment compares reparameterization and log derivative,
 each with and without Langevin preconditioning. `TEMPERATURE` stays fixed:
 there is no temperature annealing. The default 800 training updates keep the
-exercise short; the slides show separate 26,000-update runs.
+exercise short; the later estimator-comparison slide shows separate
+26,000-update runs.
 
 Set `LEARN_DIFFUSION_SCHEDULE=True` to learn the interior diffusion coefficients
 while keeping their endpoints fixed.
