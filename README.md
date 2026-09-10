@@ -1,26 +1,99 @@
 # Summer School
 
-The lessons follow the [presentation](Slides/main.pdf):
+## Install the environment and start coding
 
-| Lesson | Topic | Exercise |
-| --- | --- | --- |
-| 1 | Variational inference | [Gaussian policy notebook](L1-VariationalInference/gaussian_policy_student.ipynb) |
-| 2 | Diffusion samplers | [Diffusion sampler notebook](L2-DiffusionSamplers/diffusion_sampler_student.ipynb) |
-| 3 | Reinforcement learning as variational inference | Covered in the slides |
-| 4 | Diffusion-augmented MDPs | Covered in the slides |
+The exercises run on CPU; no GPU is required. You need Git and
+[uv](https://docs.astral.sh/uv/getting-started/installation/).
+uv manages Python and the project dependencies for you.
 
-Solution notebooks: [Lesson 1](L1-VariationalInference/gaussian_policy_solution.ipynb)
-and [Lesson 2](L2-DiffusionSamplers/diffusion_sampler_solution.ipynb).
+### 1. Install uv
+
+Linux/macOS terminal:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows PowerShell:
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Open a new terminal after installation, then check that `uv --version` and
+`git --version` work. If Git is missing, install it using the
+[Git installation instructions](https://git-scm.com/downloads).
+
+### 2. Download the course and install its dependencies
+
+```bash
+git clone --depth 1 https://github.com/sanokows/SummerSchool.git
+cd SummerSchool
+uv sync --locked
+```
+
+This creates `.venv`, installs Python 3.12 if needed, and installs the versions
+recorded in `uv.lock`, including CPU PyTorch, JupyterLab, and the interactive
+widgets. The first installation needs an internet connection.
+
+### 3. Start JupyterLab
+
+Run this from the `SummerSchool` folder:
+
+```bash
+uv run --locked jupyter lab
+```
+
+Open the browser link printed in the terminal if JupyterLab does not open
+automatically. Leave this terminal running while you work. No manual
+environment activation is needed.
+
+### 4. Open the first exercise
+
+In JupyterLab, open
+[`L1-VariationalInference/gaussian_policy_student.ipynb`](L1-VariationalInference/gaussian_policy_student.ipynb).
+If prompted, choose **Python 3 (ipykernel)**; launching JupyterLab with `uv run`
+uses the project's environment. See the
+[uv Jupyter guide](https://docs.astral.sh/uv/guides/integration/jupyter/) for details.
+
+- Run cells from top to bottom with **Shift+Enter**.
+- Implement the marked tasks; expand **Get a hint** when needed.
+- Unfinished tasks may raise `NotImplementedError` or show a reminder. Implement
+  the function, rerun its cell, then continue.
+- Once the tasks are complete, use **Restart Kernel and Run All Cells** to
+  check the whole notebook.
+
+The Lesson 2 sliders and animations need a running notebook kernel; the GitHub
+preview only displays saved notebook content.
+
+## Lessons and solutions
+
+Follow along with the [presentation](Slides/main.pdf). Its references are grouped
+into VI and diffusion foundations, diffusion samplers, RL, and diffusion RL.
+
+| Lesson | Topic | Exercise | Solution |
+| --- | --- | --- | --- |
+| 1 | Variational inference | [Gaussian policy](L1-VariationalInference/gaussian_policy_student.ipynb) | [Lesson 1 solution](L1-VariationalInference/gaussian_policy_solution.ipynb) |
+| 2 | Diffusion samplers | [Diffusion sampler](L2-DiffusionSamplers/diffusion_sampler_student.ipynb) | [Lesson 2 solution](L2-DiffusionSamplers/diffusion_sampler_solution.ipynb) |
+| 3 | Reinforcement learning as variational inference | Slides | — |
+| 4 | Diffusion-augmented MDPs | Slides | — |
+
+### Hyperparameters
 
 Each student and solution notebook starts with a **Hyperparameters** panel.
 Settings are grouped by target, model, optimization, and diagnostics, with a
-comment explaining every parameter. Edit the panel, then **Run All** so the
-target, model, training loop, and plots all use the new values.
+comment explaining every parameter. After changing the panel, restart the kernel
+and run the notebook from the top so all cells use the new values.
 
-Start with Lesson 1 and implement the reparameterization and log-derivative
-losses. Each exercise has optional **Get a hint** sections. Change `TEMPERATURE`
-in the panel to compare variational inference at positive temperature with
-reward maximization at `T = 0`.
+### Lesson 1: variational inference
+
+Implement the reparameterization loss by explicitly constructing
+`mean + std * epsilon`, then implement the log-derivative loss. Train both
+Gaussian policies and compare their learning curves and sample animations.
+Change `TEMPERATURE` to compare variational inference at positive temperature
+with reward maximization at `T = 0`.
+
+### Lesson 2: diffusion samplers
 
 Lesson 2 begins with two interactive kernel exercises:
 
@@ -38,48 +111,31 @@ Each visualization is directly below its task; the kernel log probabilities
 are only needed afterward for GMM-40 training. Kernels receive `prior_std`
 explicitly and work with both 1D demo states and 2D training states. If a task is
 unfinished, the visualization shows a reminder; rerun it after implementing the
-kernel. The controls use Jupyter widgets and require a running notebook kernel.
-After updating an existing checkout, run `uv sync --locked` and restart JupyterLab
-to install the widget dependency.
+kernel.
 
 The 22 KB pretrained model and its configuration are in
 `L2-DiffusionSamplers/assets/bimodal_score.{pt,json}`. No download or training is
 needed to use it. The reverse demo evaluates this trained network; its JSON
 records the fixed diffusion settings and validation error.
 
-The later Lesson 2 sampler supports learning the interior diffusion coefficients with
-`LEARN_DIFFUSION_SCHEDULE=True`, while keeping their endpoints fixed.
+The later GMM-40 experiment compares reparameterization and log derivative,
+each with and without Langevin preconditioning. `TEMPERATURE` stays fixed:
+there is no temperature annealing. The default 800 training updates keep the
+exercise short; the slides show separate 26,000-update runs.
+
+Set `LEARN_DIFFUSION_SCHEDULE=True` to learn the interior diffusion coefficients
+while keeping their endpoints fixed.
 `PRIOR_STD` configures the fixed Gaussian prior; learning the prior itself is
 discussed in the slides but is not implemented in the exercise.
 
-## Installation
+## Update an existing checkout
 
-### 1. Install uv
-
-Linux/macOS:
+Save your notebooks and stop JupyterLab. From the `SummerSchool` folder:
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Windows PowerShell:
-
-```powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### 2. Clone and install the environment
-
-```bash
-git clone https://github.com/sanokows/SummerSchool.git
-cd SummerSchool
+git pull --ff-only
 uv sync --locked
+uv run --locked jupyter lab
 ```
 
-This installs Python 3.12 and all dependencies in `.venv`.
-
-### 3. Start JupyterLab
-
-```bash
-uv run jupyter lab
-```
+Restarting JupyterLab also loads any updated widget dependencies.
