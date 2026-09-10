@@ -7,6 +7,7 @@ __pycache__/
 # Local slide authoring files; publish the finished presentation PDFs only.
 /Slides/*
 !/Slides/*.pdf
+/Slides/IEEE_RAS_Germany_sanokowski.pdf
 /.vscode/
 
 # Instructor checks, model training, and generated experiment outputs.

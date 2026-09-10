@@ -69,7 +69,18 @@ preview only displays saved notebook content.
 ## Lessons and solutions
 
 Follow along with the [presentation](Slides/main.pdf). Its references are grouped
-into VI and diffusion foundations, diffusion samplers, RL, and diffusion RL.
+into VI and diffusion foundations, diffusion samplers, RL, and diffusion policies
+and RL. The introduction presents
+[Guided Discovery of New Behaviors using Diffusion Policies](https://arxiv.org/abs/2606.08743)
+(accepted to CoRL) through rare-case sampling, shooting-based trajectory repair,
+and policy fine-tuning, before introducing diffusion RL. The StackCube and
+PushT slides link to the public [DA-MDP PyTorch repository](https://github.com/Atarilab/DA_MDP_pytorch)
+with code QR codes; that repository includes installation instructions,
+multimodal GIFs, working configs, and downloadable checkpoints.
+
+The StackCube example compares animated DA:REPPO and DA:PPO overlays. The
+DA-MDP lesson expands an ordinary policy decision into denoising decisions,
+and a notation table provides a reference before the closing slide.
 
 | Lesson | Topic | Exercise | Solution |
 | --- | --- | --- | --- |
