@@ -36,6 +36,10 @@ This creates `.venv`, installs Python 3.12 if needed, and installs the versions
 recorded in `uv.lock`, including CPU PyTorch, JupyterLab, and the interactive
 widgets. The first installation needs an internet connection.
 
+The lockfile includes compatible builds for both Intel and Apple Silicon Macs,
+including macOS 13. `uv` selects the matching PyTorch and NumPy versions
+automatically; no separate Mac installation command is needed.
+
 ### 3. Start JupyterLab
 
 Run this from the `SummerSchool` folder:
@@ -119,6 +123,8 @@ Each student and solution notebook starts with a **Hyperparameters** panel.
 Settings are grouped by target, model, optimization, and diagnostics, with a
 comment explaining every parameter. After changing the panel, restart the kernel
 and run the notebook from the top so all cells use the new values.
+Both lessons default to `TORCH_NUM_THREADS = 2`: using more CPU threads can
+make these small networks substantially slower.
 
 ### Lesson 1: variational inference
 
@@ -158,6 +164,8 @@ each with and without Langevin preconditioning. `TEMPERATURE` stays fixed:
 there is no temperature annealing. The default 800 training updates keep the
 exercise short; the later estimator-comparison slide shows separate
 26,000-update runs.
+The analytic target-gradient feature stays differentiable, so pathwise updates
+include its dependence on earlier denoising decisions.
 
 Set `LEARN_DIFFUSION_SCHEDULE=True` to learn the interior diffusion coefficients
 while keeping their endpoints fixed.
@@ -175,3 +183,20 @@ uv run --locked jupyter lab
 ```
 
 Restarting JupyterLab also loads any updated widget dependencies.
+
+## Regression checks
+
+Run the pathwise-gradient regression checks from the repository root:
+
+```bash
+uv run --locked python -m unittest discover -s tests -v
+```
+
+These compare automatic derivatives with finite differences after the Langevin
+gate becomes nonzero, for both fixed and learned diffusion schedules. They use
+the provided solution kernels; students do not need to finish their tasks first.
+
+The macOS dependency constraints retain PyTorch 2.2.2 with NumPy 1.x for Intel
+Macs, and PyTorch 2.10 for Apple Silicon to support systems older than macOS 14.
+Linux and Windows use current CPU PyTorch builds. The lock configuration requires
+wheels for both Mac architectures, Linux x86_64, and Windows x86_64.

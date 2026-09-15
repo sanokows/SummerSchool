@@ -52,7 +52,7 @@ def target_reward(states: torch.Tensor) -> torch.Tensor:
 def target_log_density_gradient(
     states: torch.Tensor, temperature: float
 ) -> torch.Tensor:
-    """Analytic, detached gradient of log pi_T(x) = R(x) / temperature."""
+    """Differentiable analytic gradient of log pi_T(x) = R(x) / temperature."""
     locations = MODE_LOCATIONS.to(device=states.device, dtype=states.dtype)
     differences = locations - states.unsqueeze(-2)
     component_logits = (
@@ -63,7 +63,9 @@ def target_log_density_gradient(
     gradient = (
         responsibilities.unsqueeze(-1) * differences / TARGET_STD**2
     ).sum(dim=-2)
-    return (gradient / temperature).detach()
+    # Earlier denoising decisions affect these states. Pathwise updates need
+    # the derivative of this score feature through the rest of the chain.
+    return gradient / temperature
 
 
 def configure_target(
